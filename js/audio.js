@@ -391,6 +391,20 @@
     const v = makeVoice(inst || A.instrument(), midi, vel == null ? 0.7 : vel, t, A.busFx);
     v.release(t + (dur || 0.8));
   };
+  // note déclenchée par une tuile : sur le bus du joueur, relâchée toute seule
+  A.hit = function (midi, vel, dur) {
+    if (!ctx) return;
+    A.resume();
+    const t = ctx.currentTime;
+    const v = makeVoice(A.instrument(), midi, vel, t, A.busPlayer);
+    v.release(t + (dur || 0.5));
+  };
+  // petit son sourd quand on rate
+  A.thud = function () {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [40, 41].forEach((m) => { const v = makeVoice('doux', m, 0.4, t, A.busFx); v.release(t + 0.16, 0.05); });
+  };
   A.chime = function (ok) {
     if (!ctx) return;
     if (ok) { A.play(88, 0.45, 0.4, 0, 'celesta'); A.play(95, 0.4, 0.6, 0.07, 'celesta'); }

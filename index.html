@@ -35,6 +35,7 @@
         <p class="tagline">Piano de lumière</p>
       </div>
       <nav class="menu" id="home-menu">
+        <button class="menu-item hero" data-go="tiles"><span class="mi-ico" data-ico="tiles"></span><span class="mi-txt"><b>Jouer · Tuiles</b><small>Touche les tuiles au rythme de la musique</small></span></button>
         <button class="menu-item" data-go="library"><span class="mi-ico" data-ico="notes"></span><span class="mi-txt"><b>Morceaux</b><small>Apprends des musiques, note après note</small></span></button>
         <button class="menu-item" data-go="lessons"><span class="mi-ico" data-ico="cap"></span><span class="mi-txt"><b>Leçons</b><small>Débuter le piano pas à pas</small></span></button>
         <button class="menu-item" data-go="training"><span class="mi-ico" data-ico="target"></span><span class="mi-txt"><b>Entraînement</b><small>Gammes, accords, oreille, lecture</small></span></button>
@@ -66,6 +67,21 @@
       <button class="tab" data-f="mine">Mes fichiers</button>
     </div>
     <div class="scroll"><div class="grid" id="lib-grid"></div></div>
+  </section>
+
+  <!-- ============ Tuiles : choix du morceau ============ -->
+  <section class="screen panel-screen" id="scr-tiles">
+    <header class="scr-head">
+      <button class="btn ghost icon-btn" data-back aria-label="Retour"><span data-ico="back"></span></button>
+      <h2>Tuiles</h2>
+      <div class="head-tools">
+        <div class="seg big" id="tl-level"><button data-l="1">Facile</button><button data-l="2">Normal</button><button data-l="3">Difficile</button></div>
+        <label class="check"><input type="checkbox" id="tl-zen"><span>Zen (sans vies)</span></label>
+        <div class="search"><span data-ico="search"></span><input id="tl-search" type="search" placeholder="Rechercher" autocomplete="off"></div>
+      </div>
+    </header>
+    <p class="tiles-help" id="tl-help"></p>
+    <div class="scroll"><div class="grid" id="tl-grid"></div></div>
   </section>
 
   <!-- ============ Leçons ============ -->
@@ -147,6 +163,17 @@
       <input type="range" id="f-bpm-range" min="40" max="200" step="1" value="90" aria-label="Tempo du métronome">
       <button class="hbtn rec" id="f-rec"><span class="dot"></span><span id="f-rec-label">Enregistrer</span></button>
       <span class="sustain-ind" id="f-sus">Pédale</span>
+    </div>
+  </div>
+
+  <!-- ============ HUD Tuiles ============ -->
+  <div id="tiles-hud" class="hud hidden">
+    <div class="hud-bar">
+      <button class="hbtn" id="t-pause" title="Pause (Échap)"><span data-ico="pause"></span></button>
+      <div class="h-title"><b id="t-title"></b><small id="t-sub"></small></div>
+      <div class="h-progress static"><div class="hp-fill" id="t-fill"></div></div>
+      <div class="t-lives" id="t-lives" title="Vies"></div>
+      <div class="t-laps" id="t-laps" title="Tours réussis"></div>
     </div>
   </div>
 
@@ -331,6 +358,7 @@
 <script src="js/progress.js"></script>
 <script src="js/game.js"></script>
 <script src="js/training.js"></script>
+<script src="js/tiles.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>

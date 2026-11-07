@@ -22,6 +22,8 @@
     pause: sv('<path d="M8 5v14M16 5v14"/>', 'stroke-width="2.6"'),
     play: sv('<path d="M7 4l13 8-13 8z" fill="currentColor"/>'),
     yt: sv('<rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10 9.3l5 2.7-5 2.7z" fill="currentColor"/>'),
+    tiles: sv('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7.5 3v18M12 3v18M16.5 3v18"/><rect x="8.3" y="5.5" width="2.9" height="6" rx=".6" fill="currentColor" stroke="none"/><rect x="12.8" y="12.5" width="2.9" height="6" rx=".6" fill="currentColor" stroke="none"/>'),
+    heart: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 3 4.5 6.9 4.5c2.1 0 3.5 1.1 5.1 3 1.6-1.9 3-3 5.1-3 3.9 0 6 4 4.5 7.3C19.5 16.4 12 21 12 21z"/></svg>',
     metro: sv('<path d="M8 21h8l-2.6-17h-2.8z"/><path d="M12 16l5.5-8"/>'),
     loop: sv('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'),
     close: sv('<path d="M6 6l12 12M18 6L6 18"/>'),
@@ -64,7 +66,7 @@
       else { el.classList.remove('show', 'vis'); }
     });
     screen = name;
-    const builders = { home: buildHome, library: buildLibrary, lessons: buildLessons, training: buildTraining, progress: buildProgress };
+    const builders = { home: buildHome, library: buildLibrary, lessons: buildLessons, training: buildTraining, progress: buildProgress, tiles: buildTiles };
     if (builders[name]) builders[name]();
     $('#free-hud').classList.toggle('hidden', name !== 'free');
     if (name === 'home' || name === 'free') N.renderer.setRange(...freeRange());
@@ -82,7 +84,7 @@
   U.open = function (id) {
     const el = $('#' + id);
     if (!el) return;
-    if (id === 'mdl-pause') $('#p-keys').textContent = U.shortcutsLine(true);
+    if (id === 'mdl-pause') $('#p-keys').textContent = screen === 'tiles-game' ? 'Échap : pause · ' + N.tiles.KEY_CODES.map((c) => N.input.label(c)).join(' ') + ' : les 4 colonnes' : U.shortcutsLine(true);
     el.classList.add('show');
     if (!modalStack.includes(id)) modalStack.push(id);
   };
@@ -94,6 +96,7 @@
     const i = modalStack.indexOf(id);
     if (i >= 0) modalStack.splice(i, 1);
     if (id === 'mdl-pause' && S_() && S_().paused && !modalStack.length) N.game.resume();
+    if (id === 'mdl-pause' && N.tiles.game() && N.tiles.game().paused && !modalStack.length) N.tiles.resume();
   };
   U.top = () => modalStack[modalStack.length - 1];
   function confirmBox(title, text, yes) {
@@ -356,6 +359,7 @@
   // ---------- résultats ----------
   let lastStart = null;
   function showResults(S, res) {
+    resultsKind = 'song';
     hideHud();
     const song = S.song;
     let saved = null;
@@ -387,6 +391,91 @@
     $('#r-tip').textContent = tip;
     $('#r-next').textContent = S.lesson ? 'Leçon suivante' : S.train ? 'Nouvel exercice' : 'Morceau suivant';
     lastStart = { song, opts: Object.assign({}, S.opts), lesson: S.lesson, train: S.train };
+    U.open('mdl-results');
+  }
+
+  // ---------- mode Tuiles ----------
+  const tilesOpt = Object.assign({ level: 1, zen: false }, N.store.get('tilesOpt', {}));
+  let tilesList = [];
+  function buildTiles() {
+    $$('#tl-level button').forEach((b) => b.classList.toggle('on', +b.dataset.l === tilesOpt.level));
+    $('#tl-zen').checked = !!tilesOpt.zen;
+    const touch = N.input.touchPrimary();
+    const keys = N.tiles.KEY_CODES.map((c) => `<kbd>${N.esc(N.input.label(c))}</kbd>`).join(' ');
+    $('#tl-help').innerHTML = touch
+      ? 'Touche les tuiles quand elles arrivent sur la ligne lumineuse. Garde le doigt sur les tuiles longues. Trois tours, de plus en plus vite.'
+      : `Les 4 colonnes se jouent avec ${keys}. Appuie quand la tuile touche la ligne, garde la touche sur les tuiles longues. Trois tours, de plus en plus vite.`;
+    const q = ($('#tl-search').value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    tilesList = N.songs.all().filter((s) => s.cat !== 'gen' && s.cat !== 'lesson' && (!q || (s.title + ' ' + s.composer).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)));
+    // les plus simples d'abord
+    tilesList.sort((a, b) => (a.cat === 'import' || a.cat === 'rec' ? 1 : 0) - (b.cat === 'import' || b.cat === 'rec' ? 1 : 0) || (a.level || 3) - (b.level || 3));
+    $('#tl-grid').innerHTML = tilesList.map((s) => {
+      const r = N.progress.tilesRecord(s.id, tilesOpt.level);
+      const glow = s.cat === 'import' || s.cat === 'rec' ? 'rgba(255,210,122,0.12)' : s.level >= 4 ? 'rgba(183,123,255,0.16)' : 'rgba(63,220,255,0.12)';
+      return `<button class="card" data-id="${N.esc(s.id)}" style="--glow:${glow}">
+        <div class="card-top">${s.level ? lvlHtml(s.level) : `<span>${N.songs.CATS[s.cat] || ''}</span>`}<span>${starsHtml(r ? r.stars : 0)}</span></div>
+        <h4>${N.esc(s.title)}</h4>
+        <div class="meta">${N.esc(s.composer)} · ${N.fmtTime(s.duration)}</div>
+        <div class="tags">${r && r.best ? `<span class="tag gold">Record ${N.fmtInt(r.best)}</span>` : '<span class="tag">Pas encore joué</span>'}</div>
+      </button>`;
+    }).join('');
+  }
+  async function startTiles(id) {
+    let s = N.songs.get(id);
+    if (!s) return;
+    if (s.placeholder) {
+      U.toast(`Chargement de « ${N.esc(s.title)} »…`, '', 1400);
+      try { s = await N.songs.ensure(id); } catch (e) { U.toast('Impossible de charger ce morceau.', 'err'); return; }
+    }
+    N.store.set('tilesOpt', tilesOpt);
+    try {
+      N.tiles.start(s, { level: tilesOpt.level, zen: tilesOpt.zen });
+    } catch (e) {
+      U.toast(`Ce morceau ne peut pas devenir des tuiles (${N.esc(e.message)}).`, 'err');
+      return;
+    }
+    U.closeAllModals();
+    $$('.screen').forEach((el) => el.classList.remove('show', 'vis'));
+    screen = 'tiles-game';
+    $('#free-hud').classList.add('hidden');
+    $('#tiles-hud').classList.remove('hidden');
+    $('#t-title').textContent = s.title;
+    $('#t-sub').textContent = N.tiles.LEVELS[tilesOpt.level].name + (tilesOpt.zen ? ' · Zen' : '');
+    tilesHudCache = '';
+    updateChordVisibility();
+    U.updateTilesHud();
+  }
+  let tilesHudCache = '';
+  U.updateTilesHud = function () {
+    const g = N.tiles.game();
+    if (!g) return;
+    $('#t-fill').style.width = N.clamp(g.t / Math.max(1, g.chart.duration), 0, 1) * 100 + '%';
+    const key = g.lives + '|' + g.lap + '|' + g.zen;
+    if (key === tilesHudCache) return;
+    tilesHudCache = key;
+    $('#t-lives').innerHTML = g.zen ? '<span class="zen">Zen</span>' : Array.from({ length: N.tiles.LIVES }, (_, i) => `<span class="${i < g.lives ? 'on' : ''}">${ICONS.heart}</span>`).join('');
+    $('#t-laps').innerHTML = `<span>Tour ${g.lap}/3</span>` + starsHtml(g.lap - 1);
+  };
+  function quitTiles() {
+    N.tiles.stop();
+    $('#tiles-hud').classList.add('hidden');
+    U.closeAllModals();
+    U.show('tiles');
+  }
+  let resultsKind = 'song';
+  function showTilesResults(g) {
+    resultsKind = 'tiles';
+    $('#tiles-hud').classList.add('hidden');
+    $('#r-title').textContent = g.win ? 'Magnifique, 3 tours !' : g.stars >= 1 ? 'Bien joué !' : 'Perdu !';
+    $('#r-sub').textContent = `${g.song.title} · Tuiles ${N.tiles.LEVELS[g.level].name}${g.zen ? ' · Zen' : ''}`;
+    const starsEl = $('#r-stars');
+    starsEl.innerHTML = [0, 1, 2].map(() => ICONS.star).join('');
+    $$('svg', starsEl).forEach((el, i) => setTimeout(() => { el.classList.add('show'); if (i < g.stars) { el.classList.add('on'); N.audio.play(84 + [0, 4, 7][i], 0.4, 0.5, 0, 'celesta'); } }, 250 + i * 280));
+    const cell = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
+    $('#r-grid').innerHTML = cell('Score', N.fmtInt(g.score)) + cell('Tuiles', g.hits) + cell('Parfaites', g.perfect) + cell('Combo max', g.maxCombo) + cell('Tour atteint', g.lap + '/3') + cell('Record', N.fmtInt(g.best || g.score));
+    $('#r-tip').textContent = g.newBest ? 'Nouveau record !' : !g.win && tilesOpt.level > 1 ? 'Trop dur ? Essaie en Facile ou en mode Zen.' : g.win && tilesOpt.level < 3 ? 'Prêt pour la difficulté au-dessus ?' : '';
+    $('#r-next').textContent = 'Morceau suivant';
+    $('#r-retry').textContent = 'Rejouer';
     U.open('mdl-results');
   }
 
@@ -728,6 +817,7 @@
       const top = U.top();
       if (top) { U.close(top); return; }
       if (screen === 'session' && S) { if (S.finished) return; N.game.pause(); U.open('mdl-pause'); return; }
+      if (screen === 'tiles-game') { const g = N.tiles.game(); if (g && !g.over) { N.tiles.pause(); U.open('mdl-pause'); } return; }
       if (screen === 'quiz') { stopQuiz(); return; }
       if (screen !== 'home' && screen !== 'splash') { U.show('home'); return; }
       return;
@@ -973,19 +1063,32 @@
     });
     // pause
     $('#p-resume').addEventListener('click', () => U.close('mdl-pause'));
-    $('#p-restart').addEventListener('click', () => { U.closeAllModals(); N.game.restartWith({}, false); showHud(); });
+    $('#p-restart').addEventListener('click', () => {
+      U.closeAllModals();
+      if (screen === 'tiles-game') { N.tiles.restart(); tilesHudCache = ''; return; }
+      N.game.restartWith({}, false); showHud();
+    });
     $('#p-settings').addEventListener('click', () => U.openSettings());
-    $('#p-quit').addEventListener('click', quitSession);
+    $('#p-quit').addEventListener('click', () => { if (screen === 'tiles-game') quitTiles(); else quitSession(); });
     // résultats
-    $('#r-library').addEventListener('click', () => { U.close('mdl-results'); quitSession(); });
+    $('#r-library').addEventListener('click', () => { U.close('mdl-results'); if (resultsKind === 'tiles') quitTiles(); else quitSession(); });
     $('#r-retry').addEventListener('click', () => {
       U.close('mdl-results');
+      if (resultsKind === 'tiles') { const g = N.tiles.game(); if (g) startTiles(g.song.id); return; }
       if (!lastStart) return;
       if (lastStart.train === 'scale' || lastStart.train === 'arp') { startTrain(); return; }
       U.startSong(lastStart.song, Object.assign({}, lastStart.opts, { from: undefined, loop: undefined }));
     });
     $('#r-next').addEventListener('click', () => {
       U.close('mdl-results');
+      if (resultsKind === 'tiles') {
+        const g = N.tiles.game();
+        const list = tilesList.length ? tilesList : N.songs.all();
+        const i = g ? list.findIndex((s) => s.id === g.song.id) : -1;
+        const nx = list[(i + 1) % list.length];
+        if (nx) startTiles(nx.id); else quitTiles();
+        return;
+      }
       if (!lastStart) return quitSession();
       if (lastStart.lesson) {
         const i = N.LESSONS.indexOf(lastStart.lesson);
@@ -1001,6 +1104,15 @@
       N.game.stopSession(); hideHud(); U.show('library');
       if (nx) U.openSong(nx.id);
     });
+    // tuiles
+    $('#tl-level').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; tilesOpt.level = +b.dataset.l; N.store.set('tilesOpt', tilesOpt); noBlur(); buildTiles(); });
+    $('#tl-zen').addEventListener('change', (e) => { tilesOpt.zen = e.target.checked; N.store.set('tilesOpt', tilesOpt); e.target.blur(); });
+    $('#tl-search').addEventListener('input', buildTiles);
+    $('#tl-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); buildTiles(); } });
+    $('#tl-grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (c) { noBlur(); startTiles(c.dataset.id); } });
+    $('#t-pause').addEventListener('click', () => { noBlur(); const g = N.tiles.game(); if (g && !g.over) { N.tiles.pause(); U.open('mdl-pause'); } });
+    N.on('tiles-end', (g) => { if (N.tiles.game() === g) showTilesResults(g); });
+    N.on('tiles-lap', () => { tilesHudCache = ''; });
     // leçons
     $('#lesson-path').addEventListener('click', (e) => { const b = e.target.closest('[data-lesson]'); if (b) U.openLesson(b.dataset.lesson); });
     $('#ls-start').addEventListener('click', () => curLesson && startLesson(curLesson));
@@ -1134,6 +1246,7 @@
   // appelé à chaque image
   U.frame = function (dt) {
     if (screen === 'session') U.updateHud();
+    else if (screen === 'tiles-game') U.updateTilesHud();
     if (freeMetro.on && screen === 'free') {
       const now = N.audio.now();
       while (freeMetro.next < now + 0.12) {

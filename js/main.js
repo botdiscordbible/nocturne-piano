@@ -25,6 +25,8 @@
     if (!N.settings.autoPause) return;
     const S = N.game.session;
     if (S && !S.paused && !S.finished && S.play !== 'demo') { N.game.pause(); N.ui.open('mdl-pause'); }
+    const g = N.tiles && N.tiles.game();
+    if (g && !g.paused && !g.over) { N.tiles.pause(); N.ui.open('mdl-pause'); }
   }
 
   function init() {

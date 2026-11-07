@@ -8,6 +8,7 @@
   const GLOW = 0.25;
 
   const L = (R.layout = { kbH: 160, kbTop: 0, hitY: 0, felt: 6, ww: 30, bw: 18, bh: 100 });
+  let tilesMode = false;
   const view = { start: 28, count: 36, tStart: 28, tCount: 36 };
   const keyPress = new Float32Array(128);
   const keyGlow = new Float32Array(128);
@@ -90,7 +91,7 @@
     gradVignette = ctx.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.35, W / 2, H * 0.45, Math.max(W, H) * 0.8);
     gradVignette.addColorStop(0, 'rgba(0,0,0,0)');
     gradVignette.addColorStop(1, 'rgba(0,0,0,0.55)');
-    document.documentElement.style.setProperty('--kb-h', Math.round(H - L.hitY) + 'px');
+    document.documentElement.style.setProperty('--kb-h', (tilesMode ? 0 : Math.round(H - L.hitY)) + 'px');
   };
 
   function computeLayout() {
@@ -101,6 +102,7 @@
     L.felt = 7;
     L.kbTop = H - kbH;
     L.hitY = L.kbTop - L.felt;
+    if (tilesMode) { L.kbH = 0; L.kbTop = H; L.hitY = Math.round(H * 0.82); }
     gradWhite = ctx.createLinearGradient(0, L.kbTop, 0, H);
     gradWhite.addColorStop(0, '#d9dae3');
     gradWhite.addColorStop(0.06, '#f7f7fa');
@@ -835,6 +837,241 @@
     return Math.max(60, (L.hitY - 70) / look);
   };
 
+  // ================= mode Tuiles =================
+  const TILE = {
+    one: { top: '#0d1a3c', bot: '#163a7c', edge: '#5fdcff', glow: '#3fdcff', rgb: 'rgb(63,220,255)' },
+    chord: { top: '#1e1046', bot: '#40208f', edge: '#c3a0ff', glow: '#b98aff', rgb: 'rgb(185,138,255)' },
+    hold: { top: '#0b2a3a', bot: '#0e4f66', edge: '#7ff0ff', glow: '#5fe8ff', rgb: 'rgb(95,232,255)' },
+  };
+  function board() {
+    const bw = Math.min(W * 0.66, Math.max(340, H * 0.92));
+    const x0 = (W - bw) / 2;
+    return { x0, bw, lw: bw / 4, hit: L.hitY };
+  }
+  const tilePps = () => (L.hitY - 30) / 1.6;
+  const tileH = (pps) => N.clamp(pps * 0.3, 84, 200);
+  R.setTilesMode = function (on) {
+    tilesMode = !!on;
+    computeLayout();
+    document.documentElement.style.setProperty('--kb-h', (tilesMode ? 0 : Math.round(H - L.hitY)) + 'px');
+  };
+  R.tilesMode = () => tilesMode;
+  // colonne sous le doigt (les bords de l'écran comptent pour la colonne la plus proche)
+  R.laneAt = function (x) {
+    if (!tilesMode) return -1;
+    const b = board();
+    return N.clamp(Math.floor((x - b.x0) / b.lw), 0, 3);
+  };
+  R.tileHit = function (lane, tl) {
+    const b = board();
+    const cx = b.x0 + (lane + 0.5) * b.lw;
+    const c = (tl.notes.length > 1 ? TILE.chord : tl.hold ? TILE.hold : TILE.one).rgb;
+    const n = Math.round(26 * qMul());
+    for (let i = 0; i < n; i++) spawn(cx + N.rand(-b.lw * 0.4, b.lw * 0.4), L.hitY - N.rand(0, 20), N.rand(-120, 120), N.rand(-520, -140), N.rand(0.4, 1.1), N.rand(1.8, 4), c);
+    energy = Math.min(1.6, energy + 0.15);
+  };
+  R.tilePop = function (lane, text, color) {
+    const b = board();
+    pops.push({ x: b.x0 + (lane + 0.5) * b.lw, y: L.hitY - 40, text, color, t: 0, big: false });
+    if (pops.length > 24) pops.shift();
+  };
+
+  function tileRect(tl, g, b, pps) {
+    const yb = b.hit - (tl.t - g.t) * pps;
+    const h = tl.hold ? Math.max(tileH(pps), (tl.end - tl.t) * pps) : tileH(pps);
+    return { x: b.x0 + tl.lane * b.lw + 6, y: yb - h, w: b.lw - 12, h, yb };
+  }
+
+  function drawTilesBoard(g, dt) {
+    const b = board();
+    const pps = tilePps();
+    // plateau
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, 'rgba(4,6,16,0.35)');
+    bg.addColorStop(0.8, 'rgba(6,9,24,0.72)');
+    bg.addColorStop(1, 'rgba(4,6,16,0.85)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(b.x0, 0, b.bw, H);
+    ctx.fillStyle = 'rgba(150,175,255,0.16)';
+    ctx.fillRect(Math.round(b.x0), 0, 1, H);
+    ctx.fillRect(Math.round(b.x0 + b.bw), 0, 1, H);
+    for (let i = 1; i < 4; i++) { ctx.fillStyle = 'rgba(150,175,255,0.07)'; ctx.fillRect(Math.round(b.x0 + i * b.lw), 0, 1, H); }
+    // colonnes appuyées et erreurs
+    for (let l = 0; l < 4; l++) {
+      g.flash[l] = g.flash[l] > 0 ? Math.max(0, g.flash[l] - dt * 4) : Math.min(0, g.flash[l] + dt * 3);
+      g.wrongFlash[l] = Math.max(0, g.wrongFlash[l] - dt * 3);
+      const x = b.x0 + l * b.lw;
+      const on = g.down[l] ? 1 : 0;
+      const a = Math.max(on * 0.6, g.flash[l] > 0 ? g.flash[l] : 0);
+      if (a > 0.01) {
+        const gr = ctx.createLinearGradient(0, b.hit - 260, 0, b.hit);
+        gr.addColorStop(0, 'rgba(63,220,255,0)');
+        gr.addColorStop(1, `rgba(120,230,255,${0.32 * a})`);
+        ctx.fillStyle = gr;
+        ctx.fillRect(x, b.hit - 260, b.lw, 260);
+      }
+      const red = Math.max(g.wrongFlash[l], g.flash[l] < 0 ? -g.flash[l] : 0);
+      if (red > 0.01) {
+        const gr = ctx.createLinearGradient(0, 0, 0, H);
+        gr.addColorStop(0, 'rgba(255,90,120,0)');
+        gr.addColorStop(1, `rgba(255,90,120,${0.35 * red})`);
+        ctx.fillStyle = gr;
+        ctx.fillRect(x, 0, b.lw, H);
+      }
+    }
+    // tuiles
+    const now = performance.now();
+    const topT = g.t + (b.hit + 40) / pps;
+    const i0 = Math.max(0, N.lowerBound(g.tiles, g.t - 3));
+    for (let i = i0; i < g.tiles.length; i++) {
+      const tl = g.tiles[i];
+      if (tl.t > topT) break;
+      const r = tileRect(tl, g, b, pps);
+      if (r.y > H) continue;
+      const st = tl.notes.length > 1 ? TILE.chord : tl.hold ? TILE.hold : TILE.one;
+      let alpha = 1;
+      if (tl.state === 1 && !tl.hold) {
+        const age = (now - tl.hitAt) / 1000;
+        if (age > 0.28) continue;
+        alpha = 1 - age / 0.28;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#eafcff';
+        roundRect(ctx, r.x - age * 30, r.y - age * 30, r.w + age * 60, r.h + age * 60, 12);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (tl.state === 1 && tl.hold && !tl.holding && tl.held >= 1) {
+        const age = (now - tl.hitAt) / 1000 - (tl.end - tl.t) / g.speed;
+        if (age > 0.3) continue;
+      }
+      const missed = tl.state === 2 || (tl.state === 1 && tl.hold && !tl.holding && tl.held < 1);
+      ctx.globalAlpha = missed ? 0.45 : 1;
+      const gr = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+      gr.addColorStop(0, missed ? '#2a0b14' : st.top);
+      gr.addColorStop(1, missed ? '#4a1222' : st.bot);
+      ctx.fillStyle = gr;
+      roundRect(ctx, r.x, r.y, r.w, r.h, 12);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = missed ? '#ff6d84' : st.edge;
+      roundRect(ctx, r.x + 1, r.y + 1, r.w - 2, r.h - 2, 11);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillRect(r.x + 12, r.y + 6, r.w - 24, 3);
+      if (tl.hold) {
+        // rail central et remplissage pendant qu'on tient
+        ctx.fillStyle = `rgba(255,255,255,${missed ? 0.12 : 0.3})`;
+        ctx.fillRect(r.x + r.w / 2 - 2, r.y + 14, 4, r.h - 28);
+        if (tl.state === 1 && tl.held > 0) {
+          const fh = (r.h - 4) * tl.held;
+          const fg = ctx.createLinearGradient(0, r.y + r.h - fh, 0, r.y + r.h);
+          fg.addColorStop(0, 'rgba(160,245,255,0.55)');
+          fg.addColorStop(1, 'rgba(255,255,255,0.95)');
+          ctx.fillStyle = fg;
+          roundRect(ctx, r.x + 2, Math.min(r.y + r.h - fh, b.hit - fh), r.w - 4, fh, 10);
+          ctx.fill();
+          if (tl.holding && Math.random() < 0.7) spawn(r.x + r.w / 2 + N.rand(-r.w * 0.3, r.w * 0.3), b.hit - 4, N.rand(-40, 40), N.rand(-260, -90), N.rand(0.3, 0.7), N.rand(1.4, 2.6), st.rgb);
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawGlowTiles(g) {
+    const b = board();
+    const pps = tilePps();
+    const topT = g.t + (b.hit + 40) / pps;
+    const i0 = Math.max(0, N.lowerBound(g.tiles, g.t - 3));
+    for (let i = i0; i < g.tiles.length; i++) {
+      const tl = g.tiles[i];
+      if (tl.t > topT) break;
+      if (tl.state === 2 || (tl.state === 1 && !tl.hold)) continue;
+      const r = tileRect(tl, g, b, pps);
+      const st = tl.notes.length > 1 ? TILE.chord : tl.hold ? TILE.hold : TILE.one;
+      glowCtx.globalAlpha = tl.holding ? 0.9 : 0.55;
+      glowCtx.strokeStyle = st.glow;
+      glowCtx.lineWidth = 8;
+      glowCtx.strokeRect(r.x, r.y, r.w, r.h);
+    }
+    glowCtx.globalAlpha = 0.7;
+    glowCtx.fillStyle = '#9fe4ff';
+    glowCtx.fillRect(b.x0, b.hit - 2, b.bw, 4);
+    for (let l = 0; l < 4; l++) {
+      if (!g.down[l] && !(g.flash[l] > 0)) continue;
+      glowCtx.globalAlpha = 0.9;
+      glowCtx.fillStyle = '#7fe8ff';
+      glowCtx.fillRect(b.x0 + l * b.lw, b.hit - 6, b.lw, 14);
+    }
+    glowCtx.globalAlpha = 1;
+  }
+
+  function drawTilesOverlay(g) {
+    const b = board();
+    // ligne de frappe
+    const gl = ctx.createLinearGradient(b.x0, 0, b.x0 + b.bw, 0);
+    gl.addColorStop(0, 'rgba(140,200,255,0.25)');
+    gl.addColorStop(0.5, 'rgba(200,240,255,0.95)');
+    gl.addColorStop(1, 'rgba(140,200,255,0.25)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(b.x0, b.hit - 1.5, b.bw, 3);
+    // pastilles des touches sous chaque colonne
+    const touch = N.input.touchPrimary && N.input.touchPrimary();
+    const s = N.clamp(b.lw * 0.32, 34, 58);
+    for (let l = 0; l < 4; l++) {
+      const cx = b.x0 + (l + 0.5) * b.lw;
+      const y = b.hit + (H - b.hit) * 0.5 - s / 2;
+      const on = g.down[l];
+      if (touch) {
+        ctx.fillStyle = on ? 'rgba(120,230,255,0.35)' : 'rgba(255,255,255,0.06)';
+        ctx.beginPath(); ctx.arc(cx, y + s / 2, s * 0.55, 0, 6.283); ctx.fill();
+      } else {
+        keycap(ctx, cx, y, s, N.input.label(N.tiles.KEY_CODES[l]) || '?', on
+          ? { bg: '#bff3ff', color: '#05121f', border: '#ffffff' }
+          : { bg: 'rgba(8,12,28,0.9)', color: '#ffffff', border: 'rgba(127,214,255,0.6)', shadow: true });
+      }
+    }
+    // score et combo
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(120,210,255,0.8)';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ffffff';
+    const fs = N.clamp(H * 0.075, 40, 84);
+    // sous la barre du haut (environ 70 px), même sur un petit écran
+    const sy = Math.max(N.clamp(H * 0.16, 90, 150), 74 + fs * 0.75);
+    ctx.font = `800 ${fs}px Manrope, "Segoe UI", sans-serif`;
+    ctx.fillText(String(g.score), W / 2, sy);
+    ctx.shadowBlur = 0;
+    if (g.combo >= 5) {
+      ctx.font = `700 ${N.clamp(H * 0.024, 14, 22)}px Manrope, "Segoe UI", sans-serif`;
+      ctx.fillStyle = 'rgba(255,224,138,0.95)';
+      ctx.fillText('combo × ' + g.combo, W / 2, sy + 30);
+    }
+    // bandeau (tour suivant, combo…)
+    if (g.banner) {
+      const age = (performance.now() - g.banner.t0) / 1000;
+      if (age > 2.2) g.banner = null;
+      else {
+        const a = age < 0.25 ? age / 0.25 : age > 1.6 ? 1 - (age - 1.6) / 0.6 : 1;
+        ctx.globalAlpha = Math.max(0, a);
+        ctx.font = `italic 600 ${g.banner.small ? 30 : N.clamp(H * 0.055, 30, 56)}px "Cormorant Garamond", "Sitka Banner", Georgia, serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(150,200,255,0.9)';
+        ctx.shadowBlur = 24;
+        ctx.fillText(g.banner.text, W / 2, H * 0.4);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      }
+    }
+    // consigne avant la première tuile
+    if (g.lap === 1 && g.t < g.tiles[0].t - 0.4 * g.speed) {
+      ctx.font = `600 ${N.clamp(H * 0.022, 13, 18)}px Manrope, "Segoe UI", sans-serif`;
+      ctx.fillStyle = 'rgba(220,230,255,0.85)';
+      ctx.fillText(touch ? 'Touche la tuile quand elle arrive sur la ligne' : 'Appuie sur la touche de la colonne quand la tuile arrive sur la ligne', W / 2, b.hit - 24);
+    }
+  }
+
   let last = 0;
   R.frame = function (now) {
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
@@ -849,7 +1086,7 @@
     if (Math.abs(pc - view.count) > 0.0005 || ps !== view.start) {
       const oldH = L.kbH;
       computeLayout();
-      if (Math.abs(oldH - L.kbH) > 0.5) document.documentElement.style.setProperty('--kb-h', Math.round(H - L.hitY) + 'px');
+      if (!tilesMode && Math.abs(oldH - L.kbH) > 0.5) document.documentElement.style.setProperty('--kb-h', Math.round(H - L.hitY) + 'px');
     }
     // états des touches
     for (let m = 0; m < 128; m++) {
@@ -864,6 +1101,31 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBackground(t);
     const G = N.game;
+    const TG = tilesMode && N.tiles ? N.tiles.game() : null;
+    if (TG) {
+      drawTilesBoard(TG, dt);
+      if (N.settings.quality !== 'low') {
+        glowCtx.setTransform(1, 0, 0, 1, 0, 0);
+        glowCtx.clearRect(0, 0, glowCv.width, glowCv.height);
+        glowCtx.setTransform(GLOW, 0, 0, GLOW, 0, 0);
+        drawGlowTiles(TG);
+        blurACtx.clearRect(0, 0, blurA.width, blurA.height);
+        blurACtx.filter = 'blur(4px)';
+        blurACtx.drawImage(glowCv, 0, 0);
+        blurACtx.filter = 'none';
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(blurA, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      drawTilesOverlay(TG);
+      drawParticles(dt);
+      drawPops(dt);
+      ctx.fillStyle = gradVignette;
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
     const [lo, hi] = visibleMidiRange();
     const S = G.mode === 'song' ? G.session : null;
     if (S) drawSong(S, t);

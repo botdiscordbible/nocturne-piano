@@ -204,6 +204,18 @@
       else if (code === 'KeyY' && e.key.toLowerCase() === 'z') detectedName = 'QWERTZ';
       else if (code === 'KeyQ' && e.key.toLowerCase() === 'q' && detectedName !== 'QWERTZ') detectedName = 'QWERTY';
     }
+    // mode Tuiles : 4 touches, une par colonne
+    if (N.game.mode === 'tiles' && N.tiles) {
+      const lane = N.tiles.KEYS[code];
+      if (lane != null) {
+        e.preventDefault();
+        if (!e.repeat) { I.lastSource = 'pc'; N.tiles.press(lane); }
+        return;
+      }
+      if (code === 'Space') { e.preventDefault(); return; }
+      N.ui && N.ui.onKey && N.ui.onKey(e);
+      return;
+    }
     if (code === 'Space') {
       e.preventDefault();
       if (!e.repeat && !I.sustainKey) { I.sustainKey = true; N.game.setSustain(true, 'pc'); }
@@ -223,6 +235,7 @@
   }
   function onKeyUp(e) {
     const code = e.code;
+    if (N.tiles && N.tiles.KEYS[code] != null && N.tiles.game()) { N.tiles.release(N.tiles.KEYS[code]); return; }
     if (code === 'Space') {
       e.preventDefault();
       if (I.sustainKey) { I.sustainKey = false; N.game.setSustain(false, 'pc'); }
@@ -237,8 +250,12 @@
   I.releaseAll = function () {
     for (const [code, midi] of codeDown) N.game.noteUp(midi, 'pc');
     codeDown.clear();
-    for (const [id, midi] of pointers) N.game.noteUp(midi, 'mouse');
+    for (const [id, v] of pointers) {
+      if (typeof v === 'string') { if (N.tiles) N.tiles.release(+v.slice(4)); }
+      else N.game.noteUp(v, 'mouse');
+    }
     pointers.clear();
+    if (N.tiles && N.tiles.game()) for (let l = 0; l < 4; l++) N.tiles.release(l);
     if (I.sustainKey) { I.sustainKey = false; N.game.setSustain(false, 'pc'); }
   };
 
@@ -248,7 +265,19 @@
     const r = N.renderer;
     return r ? r.keyAt(e.clientX, e.clientY) : null;
   }
+  I.touchUsed = false;
+  I.touchPrimary = () => I.touchUsed || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
   function onPointerDown(e) {
+    if (e.pointerType === 'touch') I.touchUsed = true;
+    if (N.game.mode === 'tiles' && N.tiles && N.tiles.game()) {
+      e.preventDefault();
+      const lane = N.renderer.laneAt(e.clientX);
+      if (lane < 0) return;
+      try { e.target.setPointerCapture(e.pointerId); } catch (err) { /* */ }
+      pointers.set(e.pointerId, 'lane' + lane);
+      N.tiles.press(lane);
+      return;
+    }
     const hit = pointerKey(e);
     if (!hit) return;
     e.preventDefault();
@@ -259,6 +288,7 @@
   }
   function onPointerMove(e) {
     if (!pointers.has(e.pointerId)) return;
+    if (typeof pointers.get(e.pointerId) === 'string') return;
     const hit = pointerKey(e);
     const cur = pointers.get(e.pointerId);
     if (hit && hit.midi !== cur) {
@@ -269,8 +299,10 @@
   }
   function onPointerUp(e) {
     if (!pointers.has(e.pointerId)) return;
-    N.game.noteUp(pointers.get(e.pointerId), 'mouse');
+    const v = pointers.get(e.pointerId);
     pointers.delete(e.pointerId);
+    if (typeof v === 'string') { if (N.tiles) N.tiles.release(+v.slice(4)); return; }
+    N.game.noteUp(v, 'mouse');
   }
 
   // ---------- MIDI ----------

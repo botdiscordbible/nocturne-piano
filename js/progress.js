@@ -3,7 +3,7 @@
 (function () {
   const N = window.N;
   const P = (N.progress = {});
-  const DEF = { songs: {}, lessons: {}, stats: { notes: 0, seconds: 0, songsDone: 0, chords: 0, earBest: 0, readBest: 0, loops: 0 }, days: {}, ach: {} };
+  const DEF = { songs: {}, tiles: {}, lessons: {}, stats: { notes: 0, seconds: 0, songsDone: 0, chords: 0, earBest: 0, readBest: 0, loops: 0 }, days: {}, ach: {} };
   P.data = Object.assign(JSON.parse(JSON.stringify(DEF)), N.store.get('progress', {}));
   for (const k of Object.keys(DEF)) if (!P.data[k]) P.data[k] = JSON.parse(JSON.stringify(DEF[k]));
   P.data.stats = Object.assign({}, DEF.stats, P.data.stats);
@@ -70,6 +70,22 @@
     if (song.level >= 4 && res.speed >= 1 && res.mode === 'tempo' && res.stars >= 1) P.unlock('full-speed');
     P.save(true);
     return { newBest, rec };
+  };
+  // mode Tuiles : meilleur score et étoiles (tours réussis) par morceau et par difficulté
+  P.tilesRecord = (id, level) => (P.data.tiles || {})[id + ':' + level] || null;
+  P.tilesResult = function (song, level, score, stars) {
+    P.data.tiles = P.data.tiles || {};
+    const key = song.id + ':' + level;
+    const rec = P.data.tiles[key] || { best: 0, stars: 0, plays: 0 };
+    const newBest = score > rec.best;
+    rec.best = Math.max(rec.best, score);
+    rec.stars = Math.max(rec.stars, stars);
+    rec.plays++;
+    P.data.tiles[key] = rec;
+    if (stars >= 1) P.unlock('first-song');
+    if (stars >= 3) P.unlock('stars-3');
+    P.save(true);
+    return { newBest, best: rec.best };
   };
   P.lessonResult = function (lesson, res) {
     const rec = P.data.lessons[lesson.id] || { stars: 0, done: false };

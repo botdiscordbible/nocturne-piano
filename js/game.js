@@ -374,6 +374,7 @@
   G.update = function (dt, perf) {
     if (G.mode === 'song' && G.session) updateSession(G.session, perf);
     else if (G.mode === 'quiz' && G.quiz && G.quiz.update) G.quiz.update(dt, perf);
+    else if (G.mode === 'tiles' && N.tiles) N.tiles.update(perf);
     N.progress.tick(dt);
   };
 
