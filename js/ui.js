@@ -39,6 +39,7 @@
     flame: sv('<path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-4-1-6 1-9z"/>'),
     check: sv('<path d="M5 13l4 4L19 7"/>', 'stroke-width="2.4"'),
     full: sv('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+    infinity: sv('<path d="M12 12c-2-2.7-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.3 6-4z"/><path d="M12 12c2 2.7 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.3-6 4z"/>', 'stroke-width="2.2"'),
   };
   U.ICONS = ICONS;
   U.icons = function (root) { $$('[data-ico]', root).forEach((el) => { if (!el.firstElementChild) el.innerHTML = ICONS[el.dataset.ico] || ''; }); };
@@ -395,16 +396,21 @@
   }
 
   // ---------- mode Tuiles ----------
-  const tilesOpt = Object.assign({ level: 1, zen: false }, N.store.get('tilesOpt', {}));
+  const tilesOpt = Object.assign({ level: 1 }, N.store.get('tilesOpt', {}));
+  // ancien réglage « Zen » → Entraînement
+  if (tilesOpt.mode !== 'defi' && tilesOpt.mode !== 'libre') tilesOpt.mode = tilesOpt.zen ? 'libre' : 'defi';
+  delete tilesOpt.zen;
   let tilesList = [];
   function buildTiles() {
     $$('#tl-level button').forEach((b) => b.classList.toggle('on', +b.dataset.l === tilesOpt.level));
-    $('#tl-zen').checked = !!tilesOpt.zen;
+    $$('#tl-mode button').forEach((b) => b.classList.toggle('on', b.dataset.m === tilesOpt.mode));
     const touch = N.input.touchPrimary();
     const keys = N.tiles.KEY_CODES.map((c) => `<kbd>${N.esc(N.input.label(c))}</kbd>`).join(' ');
-    $('#tl-help').innerHTML = touch
-      ? 'Touche les tuiles quand elles arrivent sur la ligne lumineuse. Garde le doigt sur les tuiles longues. Trois tours, de plus en plus vite.'
-      : `Les 4 colonnes se jouent avec ${keys}. Appuie quand la tuile touche la ligne, garde la touche sur les tuiles longues. Trois tours, de plus en plus vite.`;
+    const how = touch ? 'Touche les tuiles quand elles arrivent sur la ligne lumineuse, garde le doigt sur les tuiles longues.'
+      : `Les 4 colonnes se jouent avec ${keys}. Appuie quand la tuile touche la ligne, garde la touche sur les tuiles longues.`;
+    $('#tl-help').innerHTML = how + (tilesOpt.mode === 'libre'
+      ? ' Entraînement : si tu es en retard, la tuile s’arrête sur la ligne et la musique t’attend. Aucune erreur ne compte.'
+      : ' Trois tours, de plus en plus vite.');
     const q = ($('#tl-search').value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
     tilesList = N.songs.all().filter((s) => s.cat !== 'gen' && s.cat !== 'lesson' && (!q || (s.title + ' ' + s.composer).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)));
     // les plus simples d'abord
@@ -429,7 +435,7 @@
     }
     N.store.set('tilesOpt', tilesOpt);
     try {
-      N.tiles.start(s, { level: tilesOpt.level, zen: tilesOpt.zen });
+      N.tiles.start(s, { level: tilesOpt.level, practice: tilesOpt.mode === 'libre' });
     } catch (e) {
       U.toast(`Ce morceau ne peut pas devenir des tuiles (${N.esc(e.message)}).`, 'err');
       return;
@@ -440,7 +446,7 @@
     $('#free-hud').classList.add('hidden');
     $('#tiles-hud').classList.remove('hidden');
     $('#t-title').textContent = s.title;
-    $('#t-sub').textContent = N.tiles.LEVELS[tilesOpt.level].name + (tilesOpt.zen ? ' · Zen' : '');
+    $('#t-sub').textContent = N.tiles.LEVELS[tilesOpt.level].name + (tilesOpt.mode === 'libre' ? ' · Entraînement' : '');
     tilesHudCache = '';
     updateChordVisibility();
     U.updateTilesHud();
@@ -450,11 +456,11 @@
     const g = N.tiles.game();
     if (!g) return;
     $('#t-fill').style.width = N.clamp(g.t / Math.max(1, g.chart.duration), 0, 1) * 100 + '%';
-    const key = g.lives + '|' + g.lap + '|' + g.zen;
+    const key = g.lives + '|' + g.lap + '|' + g.practice;
     if (key === tilesHudCache) return;
     tilesHudCache = key;
-    $('#t-lives').innerHTML = g.zen ? '<span class="zen">Zen</span>' : Array.from({ length: N.tiles.LIVES }, (_, i) => `<span class="${i < g.lives ? 'on' : ''}">${ICONS.heart}</span>`).join('');
-    $('#t-laps').innerHTML = `<span>Tour ${g.lap}/3</span>` + starsHtml(g.lap - 1);
+    $('#t-lives').innerHTML = g.practice ? `<span class="zen">${ICONS.infinity}Entraînement</span>` : Array.from({ length: N.tiles.LIVES }, (_, i) => `<span class="${i < g.lives ? 'on' : ''}">${ICONS.heart}</span>`).join('');
+    $('#t-laps').innerHTML = g.practice ? '' : `<span>Tour ${g.lap}/3</span>` + starsHtml(g.lap - 1);
   };
   function quitTiles() {
     N.tiles.stop();
@@ -466,14 +472,23 @@
   function showTilesResults(g) {
     resultsKind = 'tiles';
     $('#tiles-hud').classList.add('hidden');
-    $('#r-title').textContent = g.win ? 'Magnifique, 3 tours !' : g.stars >= 1 ? 'Bien joué !' : 'Perdu !';
-    $('#r-sub').textContent = `${g.song.title} · Tuiles ${N.tiles.LEVELS[g.level].name}${g.zen ? ' · Zen' : ''}`;
-    const starsEl = $('#r-stars');
-    starsEl.innerHTML = [0, 1, 2].map(() => ICONS.star).join('');
-    $$('svg', starsEl).forEach((el, i) => setTimeout(() => { el.classList.add('show'); if (i < g.stars) { el.classList.add('on'); N.audio.play(84 + [0, 4, 7][i], 0.4, 0.5, 0, 'celesta'); } }, 250 + i * 280));
     const cell = (l, v) => `<div><small>${l}</small><b>${v}</b></div>`;
-    $('#r-grid').innerHTML = cell('Score', N.fmtInt(g.score)) + cell('Tuiles', g.hits) + cell('Parfaites', g.perfect) + cell('Combo max', g.maxCombo) + cell('Tour atteint', g.lap + '/3') + cell('Record', N.fmtInt(g.best || g.score));
-    $('#r-tip').textContent = g.newBest ? 'Nouveau record !' : !g.win && tilesOpt.level > 1 ? 'Trop dur ? Essaie en Facile ou en mode Zen.' : g.win && tilesOpt.level < 3 ? 'Prêt pour la difficulté au-dessus ?' : '';
+    const starsEl = $('#r-stars');
+    $('#r-sub').textContent = `${g.song.title} · Tuiles ${N.tiles.LEVELS[g.level].name}${g.practice ? ' · Entraînement' : ''}`;
+    if (g.practice) {
+      // entraînement : pas d'étoiles ni de record, juste ce qui s'est passé
+      const onTime = Math.round(((g.hits - g.waited) / Math.max(1, g.tiles.length)) * 100);
+      $('#r-title').textContent = 'Morceau terminé !';
+      starsEl.innerHTML = '';
+      $('#r-grid').innerHTML = cell('Tuiles', g.hits + '/' + g.tiles.length) + cell('Parfaites', g.perfect) + cell('À l’heure', onTime + ' %');
+      $('#r-tip').textContent = onTime >= 90 ? 'Presque tout à l’heure : tu es prêt pour le mode Défi !' : 'La musique t’a attendu ' + g.waited + ' fois. Rejoue-le, ça vient vite.';
+    } else {
+      $('#r-title').textContent = g.win ? 'Magnifique, 3 tours !' : g.stars >= 1 ? 'Bien joué !' : 'Perdu !';
+      starsEl.innerHTML = [0, 1, 2].map(() => ICONS.star).join('');
+      $$('svg', starsEl).forEach((el, i) => setTimeout(() => { el.classList.add('show'); if (i < g.stars) { el.classList.add('on'); N.audio.play(84 + [0, 4, 7][i], 0.4, 0.5, 0, 'celesta'); } }, 250 + i * 280));
+      $('#r-grid').innerHTML = cell('Score', N.fmtInt(g.score)) + cell('Tuiles', g.hits) + cell('Parfaites', g.perfect) + cell('Combo max', g.maxCombo) + cell('Tour atteint', g.lap + '/3') + cell('Record', N.fmtInt(g.best || g.score));
+      $('#r-tip').textContent = g.newBest ? 'Nouveau record !' : !g.win ? 'Trop dur ? Essaie le mode Entraînement : pas de vies, la tuile t’attend.' : g.win && tilesOpt.level < 3 ? 'Prêt pour la difficulté au-dessus ?' : '';
+    }
     $('#r-next').textContent = 'Morceau suivant';
     $('#r-retry').textContent = 'Rejouer';
     U.open('mdl-results');
@@ -1106,7 +1121,7 @@
     });
     // tuiles
     $('#tl-level').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; tilesOpt.level = +b.dataset.l; N.store.set('tilesOpt', tilesOpt); noBlur(); buildTiles(); });
-    $('#tl-zen').addEventListener('change', (e) => { tilesOpt.zen = e.target.checked; N.store.set('tilesOpt', tilesOpt); e.target.blur(); });
+    $('#tl-mode').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; tilesOpt.mode = b.dataset.m; N.store.set('tilesOpt', tilesOpt); noBlur(); buildTiles(); });
     $('#tl-search').addEventListener('input', buildTiles);
     $('#tl-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); buildTiles(); } });
     $('#tl-grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (c) { noBlur(); startTiles(c.dataset.id); } });

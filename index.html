@@ -76,10 +76,13 @@
       <h2>Tuiles</h2>
       <div class="head-tools">
         <div class="seg big" id="tl-level"><button data-l="1">Facile</button><button data-l="2">Normal</button><button data-l="3">Difficile</button></div>
-        <label class="check"><input type="checkbox" id="tl-zen"><span>Zen (sans vies)</span></label>
         <div class="search"><span data-ico="search"></span><input id="tl-search" type="search" placeholder="Rechercher" autocomplete="off"></div>
       </div>
     </header>
+    <div class="tl-modes" id="tl-mode">
+      <button data-m="defi"><span class="tm-ico" data-ico="heart"></span><span><b>Défi</b><small>3 vies · 3 tours de plus en plus vite · records</small></span></button>
+      <button data-m="libre"><span class="tm-ico" data-ico="infinity"></span><span><b>Entraînement</b><small>Pas de vies · la tuile t’attend · juste pour le plaisir</small></span></button>
+    </div>
     <p class="tiles-help" id="tl-help"></p>
     <div class="scroll"><div class="grid" id="tl-grid"></div></div>
   </section>

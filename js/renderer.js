@@ -919,6 +919,16 @@
         ctx.fillRect(x, 0, b.lw, H);
       }
     }
+    // entraînement : la colonne de la tuile qui t'attend pulse doucement
+    if (g.waiting) {
+      const x = b.x0 + g.waiting.lane * b.lw;
+      const p = 0.5 + 0.5 * Math.sin(performance.now() / 170);
+      const gr = ctx.createLinearGradient(0, b.hit - 240, 0, b.hit);
+      gr.addColorStop(0, 'rgba(255,214,120,0)');
+      gr.addColorStop(1, `rgba(255,214,120,${0.1 + 0.16 * p})`);
+      ctx.fillStyle = gr;
+      ctx.fillRect(x, b.hit - 240, b.lw, 240);
+    }
     // tuiles
     const now = performance.now();
     const topT = g.t + (b.hit + 40) / pps;
@@ -954,7 +964,7 @@
       roundRect(ctx, r.x, r.y, r.w, r.h, 12);
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = missed ? '#ff6d84' : st.edge;
+      ctx.strokeStyle = missed ? '#ff6d84' : tl === g.waiting ? '#ffe08a' : st.edge;
       roundRect(ctx, r.x + 1, r.y + 1, r.w - 2, r.h - 2, 11);
       ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.14)';
@@ -989,8 +999,8 @@
       if (tl.state === 2 || (tl.state === 1 && !tl.hold)) continue;
       const r = tileRect(tl, g, b, pps);
       const st = tl.notes.length > 1 ? TILE.chord : tl.hold ? TILE.hold : TILE.one;
-      glowCtx.globalAlpha = tl.holding ? 0.9 : 0.55;
-      glowCtx.strokeStyle = st.glow;
+      glowCtx.globalAlpha = tl.holding || tl === g.waiting ? 0.9 : 0.55;
+      glowCtx.strokeStyle = tl === g.waiting ? '#ffd27a' : st.glow;
       glowCtx.lineWidth = 8;
       glowCtx.strokeRect(r.x, r.y, r.w, r.h);
     }
@@ -1022,12 +1032,14 @@
       const cx = b.x0 + (l + 0.5) * b.lw;
       const y = b.hit + (H - b.hit) * 0.5 - s / 2;
       const on = g.down[l];
+      const wait = !on && g.waiting && g.waiting.lane === l;
       if (touch) {
-        ctx.fillStyle = on ? 'rgba(120,230,255,0.35)' : 'rgba(255,255,255,0.06)';
+        ctx.fillStyle = on ? 'rgba(120,230,255,0.35)' : wait ? 'rgba(255,214,120,0.32)' : 'rgba(255,255,255,0.06)';
         ctx.beginPath(); ctx.arc(cx, y + s / 2, s * 0.55, 0, 6.283); ctx.fill();
       } else {
         keycap(ctx, cx, y, s, N.input.label(N.tiles.KEY_CODES[l]) || '?', on
           ? { bg: '#bff3ff', color: '#05121f', border: '#ffffff' }
+          : wait ? { bg: '#ffe08a', color: '#1a1405', border: '#fff6d8', shadow: true }
           : { bg: 'rgba(8,12,28,0.9)', color: '#ffffff', border: 'rgba(127,214,255,0.6)', shadow: true });
       }
     }
@@ -1041,9 +1053,20 @@
     // sous la barre du haut (environ 70 px), même sur un petit écran
     const sy = Math.max(N.clamp(H * 0.16, 90, 150), 74 + fs * 0.75);
     ctx.font = `800 ${fs}px Manrope, "Segoe UI", sans-serif`;
-    ctx.fillText(String(g.score), W / 2, sy);
+    // entraînement : on compte les tuiles jouées plutôt qu'un score
+    ctx.fillText(String(g.practice ? g.hits : g.score), W / 2, sy);
     ctx.shadowBlur = 0;
-    if (g.combo >= 5) {
+    if (g.practice) {
+      ctx.font = `700 ${N.clamp(H * 0.024, 14, 22)}px Manrope, "Segoe UI", sans-serif`;
+      if (g.waiting) {
+        const p = 0.5 + 0.5 * Math.sin(performance.now() / 170);
+        ctx.fillStyle = `rgba(255,224,138,${0.7 + 0.3 * p})`;
+        ctx.fillText(touch ? 'À toi : touche la tuile dorée' : 'À toi : ' + (N.input.label(N.tiles.KEY_CODES[g.waiting.lane]) || '?'), W / 2, sy + 30);
+      } else {
+        ctx.fillStyle = 'rgba(220,230,255,0.6)';
+        ctx.fillText('sur ' + g.tiles.length + ' tuiles', W / 2, sy + 30);
+      }
+    } else if (g.combo >= 5) {
       ctx.font = `700 ${N.clamp(H * 0.024, 14, 22)}px Manrope, "Segoe UI", sans-serif`;
       ctx.fillStyle = 'rgba(255,224,138,0.95)';
       ctx.fillText('combo × ' + g.combo, W / 2, sy + 30);

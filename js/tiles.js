@@ -1,5 +1,7 @@
 /* Nocturne — mode Tuiles : 4 colonnes, on touche les tuiles au rythme, la musique joue autour.
-   Les tuiles suivent la mélodie de n'importe quel morceau ; le reste (accompagnement) est joué automatiquement. */
+   Les tuiles suivent la mélodie de n'importe quel morceau ; le reste (accompagnement) est joué automatiquement.
+   Défi : 3 vies, 3 tours de plus en plus vite. Entraînement : pas de vies, la tuile en retard attend sur la ligne
+   (la musique s'arrête avec elle) et une mauvaise touche ne coûte rien. */
 'use strict';
 (function () {
   const N = window.N;
@@ -94,6 +96,7 @@
     N.audio.killAuto();
     for (const tl of g.tiles) { tl.state = 0; tl.judge = null; tl.held = 0; tl.holding = false; tl.hitAt = 0; }
     g.ti = 0; g.ai = 0; g.autoActive = [];
+    g.waiting = null;
     g.pressed = [null, null, null, null];
     g.lead = 2.4 * g.speed;
     g.t = Math.min(0, g.tiles[0].t) - g.lead;
@@ -108,16 +111,17 @@
     const level = opt.level || 1;
     const ch = TL.chart(song, level);
     if (ch.tiles.length < 4) throw new Error('ce morceau a trop peu de notes');
+    const practice = !!(opt.practice || opt.zen);
     T = {
-      song, level, zen: !!opt.zen, chart: ch, tiles: ch.tiles, autos: ch.autos, lap: 1, baseSpeed: opt.speed || 1,
-      speed: (opt.speed || 1) * TL.LEVELS[level].speed * TL.LAP_SPEED[0], score: 0, combo: 0, maxCombo: 0, perfect: 0, hits: 0, misses: 0, lives: TL.LIVES,
-      t: 0, anchorSong: 0, anchorV: 0, paused: false, over: false, win: false, ti: 0, ai: 0, autoActive: [],
+      song, level, practice, chart: ch, tiles: ch.tiles, autos: ch.autos, lap: 1, baseSpeed: opt.speed || 1,
+      speed: (opt.speed || 1) * TL.LEVELS[level].speed * TL.LAP_SPEED[0], score: 0, combo: 0, maxCombo: 0, perfect: 0, hits: 0, misses: 0, waited: 0, waiting: null, waitStart: 0, lives: TL.LIVES,
+      t: 0, anchorSong: 0, anchorV: 0, paused: false, pausedAt: 0, over: false, win: false, ti: 0, ai: 0, autoActive: [],
       pressed: [null, null, null, null], down: [false, false, false, false], flash: [0, 0, 0, 0], wrongFlash: [0, 0, 0, 0], banner: null, started: performance.now(),
     };
     resetLap(T);
     N.game.mode = 'tiles';
     N.renderer.setTilesMode(true);
-    T.banner = { text: TL.LEVELS[level].name + ' · ' + song.title, t0: performance.now() };
+    T.banner = { text: (practice ? 'Entraînement' : TL.LEVELS[level].name) + ' · ' + song.title, t0: performance.now() };
     N.emit('tiles', T);
     return T;
   };
@@ -135,6 +139,7 @@
   TL.pause = function () {
     if (!T || T.paused || T.over) return;
     T.paused = true;
+    T.pausedAt = performance.now();
     N.audio.killAuto();
     T.autoActive = [];
     for (let l = 0; l < 4; l++) TL.release(l);
@@ -142,13 +147,16 @@
   TL.resume = function () {
     if (!T || !T.paused) return;
     T.paused = false;
+    const away = performance.now() - T.pausedAt;
+    T.started += away;
+    if (T.waiting) T.waitStart += away;
     T.ai = N.lowerBound(T.autos, T.t - 0.001);
     anchor(T);
   };
   TL.restart = function () {
     if (!T) return;
-    const { song, level, zen, baseSpeed } = T;
-    TL.start(song, { level, zen, speed: baseSpeed });
+    const { song, level, practice, baseSpeed } = T;
+    TL.start(song, { level, practice, speed: baseSpeed });
   };
 
   // ---------- boucle ----------
@@ -156,14 +164,25 @@
     const g = T;
     if (!g || g.paused || g.over) return;
     g.t = g.anchorSong + (vclock(perf) - g.anchorV) * g.speed;
-    // tuiles ratées
-    const late = 0.2 * g.speed;
-    for (let i = g.ti; i < g.tiles.length; i++) {
-      const tl = g.tiles[i];
-      if (tl.t + late > g.t) break;
-      if (tl.state === 0) { tl.state = 2; fault(g, tl.lane, 'miss'); if (g.over) return; }
+    if (g.practice) {
+      // entraînement : la tuile suivante attend sur la ligne, et la musique avec elle
+      while (g.ti < g.tiles.length && g.tiles[g.ti].state !== 0) g.ti++;
+      const nx = g.tiles[g.ti];
+      if (nx && g.t >= nx.t) {
+        g.t = nx.t;
+        anchor(g);
+        if (!g.waiting) { g.waiting = nx; g.waitStart = perf; }
+      }
+    } else {
+      // tuiles ratées
+      const late = 0.2 * g.speed;
+      for (let i = g.ti; i < g.tiles.length; i++) {
+        const tl = g.tiles[i];
+        if (tl.t + late > g.t) break;
+        if (tl.state === 0) { tl.state = 2; fault(g, tl.lane, 'miss'); if (g.over) return; }
+      }
+      while (g.ti < g.tiles.length && g.tiles[g.ti].state !== 0) g.ti++;
     }
-    while (g.ti < g.tiles.length && g.tiles[g.ti].state !== 0) g.ti++;
     // tuiles tenues
     for (let l = 0; l < 4; l++) {
       const tl = g.pressed[l];
@@ -182,7 +201,12 @@
 
   function schedule(g) {
     const look = 0.13;
-    const limit = g.t + look * g.speed;
+    let limit = g.t + look * g.speed;
+    if (g.practice) {
+      // l'accompagnement ne dépasse jamais la tuile pas encore jouée
+      while (g.ti < g.tiles.length && g.tiles[g.ti].state !== 0) g.ti++;
+      if (g.ti < g.tiles.length) limit = Math.min(limit, g.tiles[g.ti].t - 0.0005);
+    }
     while (g.ai < g.autos.length && g.autos[g.ai].t <= limit) {
       const n = g.autos[g.ai++];
       if (n.t < g.t - 0.06) continue;
@@ -200,18 +224,19 @@
   }
 
   function fault(g, lane, kind) {
+    // entraînement : aucune pénalité, juste un petit reflet rouge
+    if (g.practice) { g.wrongFlash[lane] = 0.55; return; }
     g.combo = 0;
     g.misses++;
     if (kind === 'wrong') g.wrongFlash[lane] = 1; else g.flash[lane] = -1;
     N.renderer.tilePop(lane, kind === 'wrong' ? 'Raté' : 'Manqué', '#ff7088');
-    if (g.zen) return;
     g.lives--;
     N.audio.thud();
     if (g.lives <= 0) end(g, false);
   }
 
   function lapDone(g) {
-    if (g.lap >= TL.LAP_SPEED.length) { end(g, true); return; }
+    if (g.practice || g.lap >= TL.LAP_SPEED.length) { end(g, true); return; }
     g.lap++;
     g.speed = g.baseSpeed * TL.LEVELS[g.level].speed * TL.LAP_SPEED[g.lap - 1];
     g.banner = { text: 'Tour ' + g.lap + ' · plus vite !', t0: performance.now() };
@@ -223,13 +248,17 @@
   function end(g, win) {
     g.over = true;
     g.win = win;
-    g.stars = win ? 3 : g.lap - 1;
+    g.stars = g.practice ? 0 : win ? 3 : g.lap - 1;
+    g.seconds = (performance.now() - g.started) / 1000;
     for (let l = 0; l < 4; l++) TL.release(l);
     setTimeout(() => { if (T === g) N.audio.killAuto(); }, win ? 1800 : 300);
     if (win) N.renderer.fireworks();
-    const saved = N.progress.tilesResult(g.song, g.level, g.score, g.stars);
-    g.newBest = saved.newBest;
-    g.best = saved.best;
+    // l'entraînement ne touche pas aux records
+    if (!g.practice) {
+      const saved = N.progress.tilesResult(g.song, g.level, g.score, g.stars);
+      g.newBest = saved.newBest;
+      g.best = saved.best;
+    }
     setTimeout(() => { if (T === g) N.emit('tiles-end', g); }, win ? 1300 : 900);
   }
 
@@ -241,12 +270,18 @@
     N.audio.resume();
     const early = 0.34 * g.speed, late = 0.2 * g.speed;
     let best = null;
-    for (let i = g.ti; i < g.tiles.length; i++) {
-      const tl = g.tiles[i];
-      if (tl.t > g.t + early) break;
-      if (tl.state !== 0 || tl.lane !== lane || tl.t < g.t - late) continue;
-      best = tl;
-      break;
+    if (g.waiting) {
+      // entraînement : tant qu'une tuile attend, seule sa colonne la joue
+      if (lane !== g.waiting.lane) { fault(g, lane, 'wrong'); return; }
+      best = g.waiting;
+    } else {
+      for (let i = g.ti; i < g.tiles.length; i++) {
+        const tl = g.tiles[i];
+        if (tl.t > g.t + early) break;
+        if (tl.state !== 0 || tl.lane !== lane || tl.t < g.t - late) continue;
+        best = tl;
+        break;
+      }
     }
     if (!best) {
       // pendant le décompte, une touche ne coûte rien
@@ -254,9 +289,16 @@
       fault(g, lane, 'wrong');
       return;
     }
-    const real = Math.abs(best.t - g.t) / g.speed;
+    const waitedFor = g.waiting === best;
+    const real = waitedFor ? (performance.now() - g.waitStart) / 1000 : Math.abs(best.t - g.t) / g.speed;
     best.state = 1;
     best.judge = real <= 0.07 ? 'perfect' : real <= 0.15 ? 'great' : 'good';
+    if (waitedFor) {
+      // la musique repart d'ici
+      if (real > 0.25) { best.judge = 'late'; g.waited++; }
+      g.waiting = null;
+      anchor(g);
+    }
     best.hitAt = performance.now();
     g.hits++;
     g.combo++;
@@ -271,9 +313,10 @@
     } else {
       best.notes.forEach((n) => N.audio.hit(n.midi, N.clamp(n.vel + 0.08, 0.35, 1), N.clamp(n.d, 0.25, 1.6)));
     }
+    if (g.practice) schedule(g);
     N.renderer.tileHit(lane, best);
     if (best.judge === 'perfect') N.renderer.tilePop(lane, 'Parfait', '#ffe08a');
-    if (g.combo > 0 && g.combo % 25 === 0) g.banner = { text: 'Combo ' + g.combo + ' !', t0: performance.now(), small: true };
+    if (!g.practice && g.combo > 0 && g.combo % 25 === 0) g.banner = { text: 'Combo ' + g.combo + ' !', t0: performance.now(), small: true };
     N.progress.note();
   };
   TL.release = function (lane) {

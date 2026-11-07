@@ -355,6 +355,19 @@ input[type=range] { accent-color: #8fd8ff; height: 22px; }
 .menu-item.hero b { font-size: 18px; }
 .tiles-help { margin: 0 22px 10px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
 .tiles-help kbd { margin: 0 1px; }
+/* Défi ou Entraînement */
+.tl-modes { display: flex; gap: 10px; margin: 0 22px 12px; }
+.tl-modes button { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+.tl-modes button:hover { border-color: var(--line-2); }
+.tl-modes button.on { border-color: rgba(127, 214, 255, 0.6); background: linear-gradient(120deg, rgba(40, 90, 160, 0.5), rgba(70, 40, 140, 0.4)); box-shadow: 0 8px 30px rgba(63, 160, 255, 0.15); }
+.tl-modes b { display: block; font-size: 15px; font-weight: 800; }
+.tl-modes small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.tl-modes .on small { color: #cfe0ff; }
+.tm-ico { flex: none; width: 36px; height: 36px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); }
+.tm-ico svg { width: 19px; height: 19px; }
+.tl-modes [data-m="defi"] .tm-ico { color: #ff6d8a; }
+.tl-modes [data-m="libre"] .tm-ico { color: #bff3ff; }
+@media (max-width: 560px) { .tl-modes { flex-direction: column; } }
 /* le menu Tuiles n'a pas besoin du piano : il prend toute la hauteur */
 #scr-tiles { bottom: 0; margin: 0; border: 0; border-radius: 0; background: linear-gradient(180deg, rgba(12, 14, 32, 0.96), rgba(7, 8, 20, 0.98)); }
 #scr-tiles .head-tools { flex-wrap: wrap; justify-content: flex-end; }
@@ -365,7 +378,8 @@ input[type=range] { accent-color: #8fd8ff; height: 22px; }
 .t-lives span { color: rgba(255, 255, 255, 0.16); display: inline-flex; }
 .t-lives span.on { color: #ff6d8a; filter: drop-shadow(0 0 6px rgba(255, 90, 130, 0.7)); }
 .t-lives svg { width: 20px; height: 20px; }
-.t-lives .zen { color: #bff3ff; font-weight: 800; font-size: 13px; letter-spacing: 0.08em; }
+.t-lives .zen { color: #bff3ff; font-weight: 800; font-size: 13px; letter-spacing: 0.04em; display: inline-flex; align-items: center; gap: 6px; }
+.t-lives .zen svg { width: 18px; height: 18px; }
 .t-laps { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 750; color: var(--muted); padding-right: 6px; }
 
 /* import YouTube */
