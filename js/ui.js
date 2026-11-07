@@ -152,7 +152,7 @@
     if (q && !(s.title + ' ' + s.composer).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)) return false;
     if (f === 'all') return s.cat !== 'gen' && s.cat !== 'lesson';
     if (f === 'easy') return s.level > 0 && s.level <= 2;
-    if (f === 'classique') return s.cat === 'classique' || s.cat === 'nocturne';
+    if (f === 'classique') return s.cat === 'classique' || s.cat === 'nocturne' || s.cat === 'ragtime';
     if (f === 'trad') return s.cat === 'trad' || s.cat === 'fetes';
     if (f === 'mine') return s.cat === 'import' || s.cat === 'rec';
     return true;
@@ -171,7 +171,7 @@
         <div class="card-top">${s.level ? lvlHtml(s.level) + `<span>${N.songs.LEVELS[s.level]}</span>` : `<span>${N.songs.CATS[s.cat] || ''}</span>`}<span>${starsHtml(p ? p.stars : 0)}</span></div>
         <h4>${N.esc(s.title)}</h4>
         <div class="meta">${N.esc(s.composer)} · ${N.fmtTime(s.duration)}</div>
-        <div class="tags"><span class="tag">${hands}</span>${p && p.best ? `<span class="tag gold">${N.fmtInt(p.best)}</span>` : ''}${s.cat === 'nocturne' ? '<span class="tag">Original</span>' : ''}</div>
+        <div class="tags"><span class="tag">${hands}</span>${s.classic ? '<span class="tag">Partition complète</span>' : ''}${p && p.best ? `<span class="tag gold">${N.fmtInt(p.best)}</span>` : ''}${s.cat === 'nocturne' ? '<span class="tag">Original</span>' : ''}</div>
       </button>`;
     }
     if (!libList.length) {
@@ -181,6 +181,22 @@
     }
     grid.innerHTML = h;
   }
+
+  // ouvre un morceau, en chargeant d'abord la partition complète si besoin
+  let opening = null;
+  U.openSong = async function (id) {
+    let s = N.songs.get(id);
+    if (!s) return;
+    if (s.placeholder) {
+      if (opening === id) return;
+      opening = id;
+      U.toast(`Chargement de « ${N.esc(s.title)} »…`, '', 1400);
+      try { s = await N.songs.ensure(id); }
+      catch (e) { U.toast(`Impossible de charger ce morceau (${N.esc(e.message)}).`, 'err'); return; }
+      finally { opening = null; }
+    }
+    if (s) U.openSetup(s);
+  };
 
   // ---------- préparation d'un morceau ----------
   let setupSong = null;
@@ -605,6 +621,7 @@
         ${N.EMBED ? '<p><b>Version en ligne</b> : cette page ne peut ni charger le piano de concert, ni utiliser un clavier MIDI, ni télécharger de fichier. La version complète s’ouvre avec le fichier index.html du jeu.</p>' : ''}
         <p><b>Piano de concert</b> : Salamander Grand Piano V3 d’Alexander Holm, licence CC BY 3.0, version mp3 publiée par le projet Tone.js. Chargé une fois depuis Internet puis gardé en cache.</p>
         <p><b>Morceaux</b> : œuvres du domaine public (Beethoven, Bach, Satie, Grieg, Pachelbel, chants traditionnels…), arrangées pour le jeu. Le thème « Nocturne » est une composition originale.</p>
+        <p><b>Partitions complètes</b> : Mutopia Project (mutopiaproject.org), fichiers du domaine public ou sous licence Creative Commons BY-SA — Nocturne op. 9 n° 2 (CC BY-SA 3.0), Gnossienne n° 1 (CC BY-SA 4.0), Invention n° 1 (CC BY-SA 3.0), Sonate « Clair de lune » (CC BY-SA 2.5). Détail dans songs/LICENCES.md.</p>
         <p><b>Polices</b> : Cormorant Garamond et Manrope (licence SIL Open Font).</p>
         <p><b>Où trouver des fichiers MIDI ?</b> Mutopia Project et Musopen proposent des partitions libres de droits avec leur MIDI. Glisse le fichier dans la fenêtre pour l’apprendre.</p></div>`;
     }
@@ -898,7 +915,7 @@
     $('#lib-tabs').addEventListener('click', (e) => { const t = e.target.closest('.tab'); if (!t) return; libFilter = t.dataset.f; buildLibrary(); });
     $('#lib-search').addEventListener('input', buildLibrary);
     $('#lib-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); buildLibrary(); } });
-    $('#lib-grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (!c) return; const s = N.songs.get(c.dataset.id); if (s) U.openSetup(s); });
+    $('#lib-grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (c) U.openSong(c.dataset.id); });
     $('#btn-import').addEventListener('click', () => $('#file-midi').click());
     $('#btn-yt').addEventListener('click', () => U.openYouTube());
     $('#yt-go').addEventListener('click', ytGo);
@@ -982,7 +999,7 @@
       const i = list.findIndex((s) => s.id === lastStart.song.id);
       const nx = list[(i + 1) % list.length];
       N.game.stopSession(); hideHud(); U.show('library');
-      if (nx) U.openSetup(nx);
+      if (nx) U.openSong(nx.id);
     });
     // leçons
     $('#lesson-path').addEventListener('click', (e) => { const b = e.target.closest('[data-lesson]'); if (b) U.openLesson(b.dataset.lesson); });

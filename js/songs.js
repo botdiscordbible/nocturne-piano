@@ -182,12 +182,56 @@
   ];
 
   S.LEVELS = ['', 'Facile', 'Débutant', 'Intermédiaire', 'Avancé', 'Expert'];
-  S.CATS = { trad: 'Traditionnel', classique: 'Classique', fetes: 'Fêtes', nocturne: 'Original', import: 'Mes fichiers', rec: 'Enregistrements', lesson: 'Leçon', gen: 'Entraînement' };
+  S.CATS = { trad: 'Traditionnel', classique: 'Classique', ragtime: 'Ragtime', fetes: 'Fêtes', nocturne: 'Original', import: 'Mes fichiers', rec: 'Enregistrements', lesson: 'Leçon', gen: 'Entraînement' };
 
   // ---------- bibliothèque ----------
   S.builtin = [];
+  S.classics = [];
   S.imported = [];
   const cache = new Map();
+
+  // ---------- grands classiques : partitions complètes chargées à la demande (songs/*.js) ----------
+  const classicData = new Map();
+  const classicWait = new Map();
+  S.addData = function (id, b64) {
+    classicData.set(id, b64);
+    const r = classicWait.get(id);
+    if (r) { classicWait.delete(id); r(); }
+  };
+  S.initClassics = function () {
+    S.classics = (S.CLASSICS || []).map((m) => {
+      const p = { id: m.id, title: m.title, composer: m.composer, level: m.level, cat: m.cat, desc: m.desc, duration: m.duration, hasR: true, hasL: true, notes: [], noteCount: m.notes, placeholder: true, classic: m };
+      cache.set(m.id, p);
+      return p;
+    });
+  };
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = res;
+      el.onerror = () => rej(new Error('fichier introuvable'));
+      document.head.appendChild(el);
+    });
+  }
+  S.ensure = async function (id) {
+    const cur = cache.get(id);
+    if (!cur || !cur.placeholder) return cur || null;
+    const m = cur.classic;
+    if (!classicData.has(id)) {
+      const wait = new Promise((r) => classicWait.set(id, r));
+      await loadScript(m.file);
+      await Promise.race([wait, new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé')), 10000))]);
+    }
+    const bin = atob(classicData.get(id));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const song = S.fromMidi(N.midiFile.parse(bytes.buffer), { id, title: m.title, composer: m.composer }, null, 60);
+    Object.assign(song, { level: m.level, cat: m.cat, desc: m.desc, source: 'classic', license: m.license, mutopia: m.mutopia, classic: m });
+    cache.set(id, song);
+    S.classics = S.classics.map((s) => (s.id === id ? song : s));
+    return song;
+  };
 
   S.initBuiltin = function () {
     S.builtin = S.BUILTIN_DEFS.map((def) => {
@@ -197,7 +241,7 @@
     });
   };
   S.get = (id) => cache.get(id) || null;
-  S.all = () => S.builtin.concat(S.imported);
+  S.all = () => S.builtin.concat(S.classics, S.imported);
 
   // fichiers importés (IndexedDB) : { id, title, bytes, added, assign, split, kind }
   S.loadImported = async function () {

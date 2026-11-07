@@ -29,6 +29,7 @@
 
   function init() {
     N.songs.initBuiltin();
+    N.songs.initClassics();
     const stage = document.getElementById('stage');
     N.renderer.init(stage);
     N.input.init(stage);
