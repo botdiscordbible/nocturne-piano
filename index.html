@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nocturne — Piano de lumière</title>
+<meta name="description" content="Jeu de piano : joue au clavier d'ordinateur ou MIDI, apprends des morceaux note après note.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="stage" aria-label="Clavier de piano et notes lumineuses"></canvas>
+
+<div id="app">
+
+  <!-- ============ Accueil (entrée) ============ -->
+  <section class="screen show vis" id="scr-splash">
+    <div class="splash-inner">
+      <div class="logo-mark" aria-hidden="true"></div>
+      <h1 class="logo">Nocturne</h1>
+      <p class="tagline">Piano de lumière</p>
+      <button class="btn primary big" id="btn-enter">Entrer</button>
+      <p class="hint-small">ou appuie sur n’importe quelle touche</p>
+    </div>
+  </section>
+
+  <!-- ============ Menu principal ============ -->
+  <section class="screen" id="scr-home">
+    <div class="home-col">
+      <div class="home-brand">
+        <h1 class="logo small">Nocturne</h1>
+        <p class="tagline">Piano de lumière</p>
+      </div>
+      <nav class="menu" id="home-menu">
+        <button class="menu-item" data-go="library"><span class="mi-ico" data-ico="notes"></span><span class="mi-txt"><b>Morceaux</b><small>Apprends des musiques, note après note</small></span></button>
+        <button class="menu-item" data-go="lessons"><span class="mi-ico" data-ico="cap"></span><span class="mi-txt"><b>Leçons</b><small>Débuter le piano pas à pas</small></span></button>
+        <button class="menu-item" data-go="training"><span class="mi-ico" data-ico="target"></span><span class="mi-txt"><b>Entraînement</b><small>Gammes, accords, oreille, lecture</small></span></button>
+        <button class="menu-item" data-go="free"><span class="mi-ico" data-ico="spark"></span><span class="mi-txt"><b>Jeu libre</b><small>Improvise, enregistre, exporte en MIDI</small></span></button>
+        <button class="menu-item" data-go="progress"><span class="mi-ico" data-ico="chart"></span><span class="mi-txt"><b>Progression</b><small>Statistiques, calendrier, succès</small></span></button>
+        <button class="menu-item" data-go="settings"><span class="mi-ico" data-ico="gear"></span><span class="mi-txt"><b>Réglages</b><small>Son, clavier, affichage</small></span></button>
+      </nav>
+    </div>
+    <div class="home-status" id="home-status"></div>
+    <div class="home-hint" id="home-hint"></div>
+  </section>
+
+  <!-- ============ Bibliothèque ============ -->
+  <section class="screen panel-screen" id="scr-library">
+    <header class="scr-head">
+      <button class="btn ghost icon-btn" data-back aria-label="Retour"><span data-ico="back"></span></button>
+      <h2>Morceaux</h2>
+      <div class="head-tools">
+        <div class="search"><span data-ico="search"></span><input id="lib-search" type="search" placeholder="Rechercher un morceau" autocomplete="off"></div>
+        <button class="btn" id="btn-import"><span data-ico="import"></span>Importer un MIDI</button>
+      </div>
+    </header>
+    <div class="tabs" id="lib-tabs">
+      <button class="tab on" data-f="all">Tous</button>
+      <button class="tab" data-f="easy">Débutant</button>
+      <button class="tab" data-f="classique">Classique</button>
+      <button class="tab" data-f="trad">Traditionnel &amp; fêtes</button>
+      <button class="tab" data-f="mine">Mes fichiers</button>
+    </div>
+    <div class="scroll"><div class="grid" id="lib-grid"></div></div>
+  </section>
+
+  <!-- ============ Leçons ============ -->
+  <section class="screen panel-screen" id="scr-lessons">
+    <header class="scr-head">
+      <button class="btn ghost icon-btn" data-back aria-label="Retour"><span data-ico="back"></span></button>
+      <h2>Leçons</h2>
+      <p class="head-sub" id="lessons-sub"></p>
+    </header>
+    <div class="scroll"><ol class="path" id="lesson-path"></ol></div>
+  </section>
+
+  <!-- ============ Entraînement ============ -->
+  <section class="screen panel-screen" id="scr-training">
+    <header class="scr-head">
+      <button class="btn ghost icon-btn" data-back aria-label="Retour"><span data-ico="back"></span></button>
+      <h2>Entraînement</h2>
+      <p class="head-sub">Des exercices courts pour progresser vite.</p>
+    </header>
+    <div class="scroll"><div class="train-grid" id="train-grid"></div></div>
+  </section>
+
+  <!-- ============ Progression ============ -->
+  <section class="screen panel-screen" id="scr-progress">
+    <header class="scr-head">
+      <button class="btn ghost icon-btn" data-back aria-label="Retour"><span data-ico="back"></span></button>
+      <h2>Progression</h2>
+    </header>
+    <div class="scroll" id="progress-body"></div>
+  </section>
+
+  <!-- ============ HUD morceau ============ -->
+  <div id="hud" class="hud hidden">
+    <div class="hud-bar">
+      <button class="hbtn" id="h-pause" title="Pause (Échap)"><span data-ico="pause"></span></button>
+      <div class="h-title"><b id="h-title"></b><small id="h-sub"></small></div>
+      <div class="h-progress" id="h-progress" title="Clique pour te déplacer · Maj + glisser pour créer une boucle">
+        <div class="hp-loop" id="hp-loop"></div>
+        <div class="hp-fill" id="hp-fill"></div>
+        <div class="hp-head" id="hp-head"></div>
+      </div>
+      <span class="h-time" id="h-time">0:00</span>
+      <div class="h-group">
+        <div class="seg" id="h-hands" title="Mains jouées">
+          <button data-h="L" title="Main gauche">G</button><button data-h="RL" title="Deux mains">2</button><button data-h="R" title="Main droite">D</button>
+        </div>
+        <div class="seg" id="h-mode" title="Mode">
+          <button data-m="wait" title="Le morceau t’attend">Attente</button><button data-m="tempo" title="En rythme, avec score">Défi</button><button data-m="demo" title="Écouter">Écoute</button>
+        </div>
+        <div class="speed" title="Vitesse (flèches ↑ ↓)">
+          <button class="hbtn sm" id="h-slower" aria-label="Plus lent">−</button>
+          <span id="h-speed">100 %</span>
+          <button class="hbtn sm" id="h-faster" aria-label="Plus rapide">+</button>
+        </div>
+        <button class="hbtn tog" id="h-metro" title="Métronome"><span data-ico="metro"></span></button>
+        <button class="hbtn tog" id="h-loop" title="Boucle sur 2 mesures"><span data-ico="loop"></span></button>
+      </div>
+      <div class="h-score" id="h-score">
+        <div><small>Score</small><b id="hs-score">0</b></div>
+        <div><small>Combo</small><b id="hs-combo">0</b></div>
+        <div><small>Précision</small><b id="hs-acc">—</b></div>
+      </div>
+    </div>
+    <div class="lesson-tip hidden" id="lesson-tip"></div>
+    <div class="key-ticker hidden" id="key-ticker" aria-live="off"></div>
+  </div>
+
+  <!-- ============ HUD jeu libre ============ -->
+  <div id="free-hud" class="hud hidden">
+    <div class="hud-bar compact">
+      <button class="hbtn" id="f-back" title="Menu (Échap)"><span data-ico="back"></span></button>
+      <label class="sel"><span>Son</span><select id="f-inst"></select></label>
+      <div class="speed" title="Octave du clavier d’ordinateur (flèches ↑ ↓)">
+        <button class="hbtn sm" id="f-oct-down" aria-label="Octave plus grave">−</button>
+        <span id="f-oct">Octave 3</span>
+        <button class="hbtn sm" id="f-oct-up" aria-label="Octave plus aiguë">+</button>
+      </div>
+      <button class="hbtn tog wide" id="f-metro"><span data-ico="metro"></span><span id="f-bpm">90</span></button>
+      <input type="range" id="f-bpm-range" min="40" max="200" step="1" value="90" aria-label="Tempo du métronome">
+      <button class="hbtn rec" id="f-rec"><span class="dot"></span><span id="f-rec-label">Enregistrer</span></button>
+      <span class="sustain-ind" id="f-sus">Pédale</span>
+    </div>
+  </div>
+
+  <div id="chord-name" class="chord-name" aria-live="polite"></div>
+
+  <!-- ============ Carte d'entraînement ============ -->
+  <div id="quiz" class="quiz hidden">
+    <div class="quiz-top">
+      <button class="hbtn" id="q-back" title="Quitter (Échap)"><span data-ico="back"></span></button>
+      <span class="quiz-title" id="q-title"></span>
+      <div class="quiz-score"><span>Réussis <b id="q-ok">0</b></span><span>Série <b id="q-streak">0</b></span><span>Record <b id="q-best">0</b></span></div>
+    </div>
+    <div class="quiz-card" id="q-card">
+      <div class="q-big" id="q-big"></div>
+      <div class="q-sub" id="q-sub"></div>
+      <div class="q-note" id="q-note"></div>
+      <div class="q-actions" id="q-actions"></div>
+    </div>
+  </div>
+
+  <!-- ============ Fenêtres ============ -->
+  <div class="modal" id="mdl-setup" role="dialog" aria-modal="true">
+    <div class="sheet setup">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <div class="setup-head">
+        <div class="setup-level" id="su-level"></div>
+        <h3 id="su-title"></h3>
+        <p class="setup-meta" id="su-meta"></p>
+        <p class="setup-desc" id="su-desc"></p>
+      </div>
+      <div class="field"><label>Mains</label>
+        <div class="seg big" id="su-hands"><button data-h="L">Main gauche</button><button data-h="RL">Les deux</button><button data-h="R">Main droite</button></div>
+      </div>
+      <div class="field"><label>Mode</label>
+        <div class="modes" id="su-mode">
+          <button data-m="wait"><b>Apprendre</b><small>Le morceau attend que tu joues la bonne note.</small></button>
+          <button data-m="tempo"><b>Défi</b><small>En rythme, avec score, combo et étoiles.</small></button>
+          <button data-m="demo"><b>Écouter</b><small>Le jeu joue le morceau pour toi.</small></button>
+        </div>
+      </div>
+      <div class="field row"><label for="su-speed">Vitesse</label><input type="range" id="su-speed" min="25" max="150" step="5" value="100"><span class="val" id="su-speed-val">100 %</span></div>
+      <div class="field checks">
+        <label class="check"><input type="checkbox" id="su-metro"><span>Métronome</span></label>
+        <label class="check"><input type="checkbox" id="su-other" checked><span>Jouer l’autre main pour moi</span></label>
+        <label class="check" id="su-fold-wrap"><input type="checkbox" id="su-fold" checked><span>Ramener les notes sur le clavier d’ordinateur</span></label>
+      </div>
+      <div class="field tracks hidden" id="su-tracks-wrap"><label>Pistes du fichier</label><div id="su-tracks"></div></div>
+      <div class="setup-foot">
+        <div class="setup-best" id="su-best"></div>
+        <div class="setup-btns">
+          <button class="btn danger hidden" id="su-delete">Supprimer</button>
+          <button class="btn primary big" id="su-start">Commencer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-pause" role="dialog" aria-modal="true">
+    <div class="sheet small center">
+      <h3>Pause</h3>
+      <div class="stack">
+        <button class="btn primary big" id="p-resume">Reprendre</button>
+        <button class="btn" id="p-restart">Recommencer</button>
+        <button class="btn" id="p-settings">Réglages</button>
+        <button class="btn ghost" id="p-quit">Quitter le morceau</button>
+      </div>
+      <p class="hint-small" id="p-keys"></p>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-results" role="dialog" aria-modal="true">
+    <div class="sheet results center">
+      <div class="res-stars" id="r-stars"></div>
+      <h3 id="r-title">Bravo !</h3>
+      <p class="res-sub" id="r-sub"></p>
+      <div class="res-grid" id="r-grid"></div>
+      <p class="res-tip" id="r-tip"></p>
+      <div class="row-btns">
+        <button class="btn" id="r-library">Retour</button>
+        <button class="btn" id="r-retry">Rejouer</button>
+        <button class="btn primary" id="r-next">Suivant</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-lesson" role="dialog" aria-modal="true">
+    <div class="sheet lesson">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <div class="lesson-num" id="ls-num"></div>
+      <h3 id="ls-title"></h3>
+      <div class="lesson-text" id="ls-text"></div>
+      <div class="row-btns end"><button class="btn primary big" id="ls-start">Commencer la leçon</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-train" role="dialog" aria-modal="true">
+    <div class="sheet setup">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <div class="setup-head"><h3 id="tr-title"></h3><p class="setup-desc" id="tr-desc"></p></div>
+      <div id="tr-fields"></div>
+      <div class="setup-foot"><div></div><button class="btn primary big" id="tr-start">Commencer</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-settings" role="dialog" aria-modal="true">
+    <div class="sheet settings">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <h3>Réglages</h3>
+      <div class="tabs" id="set-tabs"><button class="tab on" data-t="son">Son</button><button class="tab" data-t="clavier">Clavier &amp; MIDI</button><button class="tab" data-t="affichage">Affichage</button><button class="tab" data-t="donnees">Données &amp; crédits</button></div>
+      <div class="set-body" id="set-body"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-rec" role="dialog" aria-modal="true">
+    <div class="sheet small center">
+      <h3>Enregistrement terminé</h3>
+      <p class="res-sub" id="rec-info"></p>
+      <div class="field"><input type="text" id="rec-name" class="text" maxlength="60" placeholder="Nom du morceau"></div>
+      <div class="stack">
+        <button class="btn" id="rec-play">Réécouter</button>
+        <button class="btn" id="rec-save">Ajouter à mes morceaux</button>
+        <button class="btn" id="rec-export">Exporter en fichier MIDI</button>
+        <button class="btn ghost" id="rec-discard">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-kb" role="dialog" aria-modal="true">
+    <div class="sheet kbsetup">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <h3>Ton clavier</h3>
+      <p class="setup-desc">Nocturne s’adapte à ton clavier d’ordinateur. Tout reste modifiable dans les Réglages.</p>
+      <div class="field"><label>Lettres de ton clavier</label><div class="seg big" id="kb-labels"></div></div>
+      <div class="field"><label>Format</label><div class="formats" id="kb-format"></div></div>
+      <div class="kb-preview" id="kb-preview"></div>
+      <div class="setup-foot"><div class="hint-small" style="margin:0">Tu as un clavier MIDI ? Branche-le : il est reconnu tout seul.</div><button class="btn primary big" id="kb-ok">C’est parti</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-confirm" role="dialog" aria-modal="true">
+    <div class="sheet small center">
+      <h3 id="cf-title"></h3>
+      <p class="res-sub" id="cf-text"></p>
+      <div class="row-btns"><button class="btn" id="cf-no">Annuler</button><button class="btn danger" id="cf-yes">Confirmer</button></div>
+    </div>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="drop" class="drop"><div><span data-ico="import"></span><b>Dépose ton fichier MIDI</b><small>.mid ou .midi — il rejoindra « Mes fichiers »</small></div></div>
+  <input type="file" id="file-midi" accept=".mid,.midi,.kar,.rmi,audio/midi,audio/x-midi" multiple hidden>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/midifile.js"></script>
+<script src="js/notation.js"></script>
+<script src="js/songs.js"></script>
+<script src="js/lessons.js"></script>
+<script src="js/theory.js"></script>
+<script src="js/input.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/game.js"></script>
+<script src="js/training.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
