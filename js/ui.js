@@ -21,6 +21,7 @@
     import: sv('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>'),
     pause: sv('<path d="M8 5v14M16 5v14"/>', 'stroke-width="2.6"'),
     play: sv('<path d="M7 4l13 8-13 8z" fill="currentColor"/>'),
+    yt: sv('<rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10 9.3l5 2.7-5 2.7z" fill="currentColor"/>'),
     metro: sv('<path d="M8 21h8l-2.6-17h-2.8z"/><path d="M12 16l5.5-8"/>'),
     loop: sv('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'),
     close: sv('<path d="M6 6l12 12M18 6L6 18"/>'),
@@ -124,18 +125,21 @@
     U.icons(el);
   }
   U.buildStatus = buildStatus;
+  // touches d'ordinateur pour une liste de décalages (les absentes sont ignorées)
+  function kbdRow(offs, hand) {
+    const I = N.input, o = I.octave, b = 12 * (o + 1);
+    return offs.map((x) => I.labelForMidi(b + x, hand, o)).filter(Boolean).map((l) => `<kbd>${N.esc(l)}</kbd>`).join(' ');
+  }
+  U.kbdRow = kbdRow;
   function pcHint() {
-    const I = N.input;
-    const o = I.octave;
-    const lab = (m) => I.labelForMidi(m, m >= 12 * (o + 2) ? 'R' : 'L', o);
-    const b = 12 * (o + 1);
-    if (N.settings.layout === 'simple') {
-      const whites = [0, 2, 4, 5, 7, 9, 11, 12].map((x) => `<kbd>${N.esc(lab(b + x))}</kbd>`).join(' ');
-      return `Ton clavier est un piano : ${whites} = Do Ré Mi Fa Sol La Si Do · rangée du dessus : dièses<br>${N.esc(U.shortcutsLine(false))}`;
+    const id = N.input.layout().id;
+    const keys = N.esc(U.shortcutsLine(false));
+    if (id === 'simple') return `Ton clavier est un piano : ${kbdRow([0, 2, 4, 5, 7, 9, 11, 12], 'R')} = Do Ré Mi Fa Sol La Si Do · rangée du dessus : dièses<br>${keys}`;
+    if (id === 'lettres') {
+      return `Ton clavier est un piano : ${kbdRow([12, 14, 16, 17, 19, 21, 23, 24], 'R')} = Do Ré Mi Fa Sol La Si Do<br>`
+        + `${kbdRow([13, 15, 18, 20, 22], 'R')} = touches noires · ${kbdRow([0, 2, 4, 5, 7, 9, 11], 'L')} = une octave plus bas<br>${keys}`;
     }
-    const up = [12, 14, 16, 17, 19, 21, 23, 24].map((x) => `<kbd>${N.esc(I.labelForMidi(b + x, 'R', o))}</kbd>`).join(' ');
-    const low = [0, 2, 4, 5, 7, 9, 11].map((x) => `<kbd>${N.esc(I.labelForMidi(b + x, 'L', o))}</kbd>`).join(' ');
-    return `Ton clavier est un piano : ${up} = Do Ré Mi Fa Sol La Si Do<br>${low} = une octave plus bas · chiffres et rangée du milieu : touches noires<br>${N.esc(U.shortcutsLine(false))}`;
+    return `Ton clavier est un piano : ${kbdRow([12, 14, 16, 17, 19, 21, 23, 24], 'R')} = Do Ré Mi Fa Sol La Si Do<br>${kbdRow([0, 2, 4, 5, 7, 9, 11], 'L')} = une octave plus bas · chiffres et rangée du milieu : touches noires<br>${keys}`;
   }
   function buildHome() {
     buildStatus();
@@ -172,7 +176,7 @@
     }
     if (!libList.length) {
       h = libFilter === 'mine'
-        ? `<div class="empty"><b>Aucun fichier pour l’instant.</b><br>Glisse un fichier <b>.mid</b> n’importe où dans la fenêtre, ou clique sur « Importer un MIDI ».<br>Tu trouveras des milliers de partitions MIDI libres de droits sur Mutopia Project ou Musopen.<br>Tes improvisations enregistrées en jeu libre arrivent aussi ici.</div>`
+        ? `<div class="empty"><b>Aucun fichier pour l’instant.</b><br>Clique sur « Depuis YouTube » pour transformer une vidéo de piano en morceau, ou glisse un fichier <b>.mid</b> n’importe où dans la fenêtre.<br>Tu trouveras des milliers de partitions MIDI libres de droits sur Mutopia Project ou Musopen.<br>Tes improvisations enregistrées en jeu libre arrivent aussi ici.</div>`
         : `<div class="empty">Aucun morceau ne correspond.</div>`;
     }
     grid.innerHTML = h;
@@ -572,7 +576,8 @@
       h += `<div class="set-row"><div class="lab"><b>Assistant clavier</b><small>Choisir en deux clics les lettres et le format de ton clavier</small></div><button class="btn" id="set-kb-wizard">Ouvrir</button></div>`;
       h += rowSelect('kbLabels', 'Lettres de ton clavier', 'Détecté : ' + N.esc(N.input.detectedName() || 'inconnu (AZERTY par défaut)'), [['auto', 'Automatique'], ['azerty', 'AZERTY'], ['qwerty', 'QWERTY'], ['qwertz', 'QWERTZ']], s.kbLabels);
       h += rowSelect('kbFormat', 'Format du clavier', N.input.FORMATS[s.kbFormat] ? N.input.FORMATS[s.kbFormat].desc : '', Object.keys(N.input.FORMATS).sort((a, b) => (b === 'compact' ? 72 : +b) - (a === 'compact' ? 72 : +a)).map((k) => [k, N.input.FORMATS[k].name + ' (' + N.input.FORMATS[k].pct + ')']), s.kbFormat);
-      h += rowSelect('layout', 'Notes sur le clavier d’ordinateur', N.settings.layout === 'double' ? 'Deux rangées de lettres = 2,5 octaves' : 'Une rangée, plus simple, 1,5 octave', [['double', 'Deux rangées (2,5 octaves)'], ['simple', 'Une rangée (1,5 octave)']], s.layout);
+      const LAYDESC = { lettres: 'Uniquement des lettres : rangée du milieu = touches blanches, lettres au-dessus = noires, rangée du bas = octave grave', double: 'Lettres + chiffres et ponctuation : 2,5 octaves', simple: 'Une seule rangée, comme les logiciels de musique' };
+      h += rowSelect('layout', 'Notes sur le clavier d’ordinateur', LAYDESC[N.input.layout().id] || '', [['lettres', 'Lettres seulement (le plus simple)'], ['double', 'Lettres + chiffres (2,5 octaves)'], ['simple', 'Une rangée (1,5 octave)']], N.input.layout().id);
       h += `<div class="set-sub">Touches de commande<button class="btn ghost sm" id="set-keys-reset">Réinitialiser pour ce format</button></div>`;
       const binds = N.input.bindings();
       for (const a of N.input.ACTIONS) {
@@ -643,10 +648,11 @@
       const F = I.FORMATS[f];
       return `<button data-f="${f}" class="${String(s.kbFormat) === f ? 'on' : ''}">${kbSvg(f)}<b>${F.name}</b><small>${F.pct}</small></button>`;
     }).join('');
-    const o = I.octave, b = 12 * (o + 1);
-    const notes = (s.layout === 'simple' ? [0, 2, 4, 5, 7, 9, 11, 12] : [12, 14, 16, 17, 19, 21, 23, 24]).map((x) => `<kbd>${N.esc(I.labelForMidi(b + x, 'R', o))}</kbd>`).join(' ');
+    const lid = I.layout().id;
+    const notes = kbdRow(lid === 'simple' ? [0, 2, 4, 5, 7, 9, 11, 12] : [12, 14, 16, 17, 19, 21, 23, 24], 'R');
     const B = I.bindings();
-    $('#kb-preview').innerHTML = `<div><span>Notes</span>${notes}<em>= Do Ré Mi Fa Sol La Si Do</em></div>
+    const extra = lid === 'lettres' ? `<div><span>Noires</span>${kbdRow([13, 15, 18, 20, 22], 'R')}<em>dièses</em> · ${kbdRow([0, 2, 4, 5, 7, 9, 11], 'L')}<em>octave grave</em></div>` : '';
+    $('#kb-preview').innerHTML = `<div><span>Notes</span>${notes}<em>= Do Ré Mi Fa Sol La Si Do</em></div>${extra}
       <div><span>Morceaux</span>${kbdList(B.slower)} ${kbdList(B.faster)}<em>vitesse</em> · ${kbdList(B.prev)} ${kbdList(B.next)}<em>mesures</em></div>
       <div><span>Jeu libre</span>${kbdList([...(B.octDown || []), ...(B.octUp || [])])}<em>octave</em></div>
       <div><span>Partout</span><kbd>Espace</kbd><em>pédale</em> · <kbd>Échap</kbd><em>pause</em> · <kbd>Maj</kbd><em>plus fort</em></div>
@@ -766,6 +772,93 @@
     return `Espace : pédale · ${oct || k('slower') + ' ' + k('faster')} : octave · Maj : jouer plus fort`;
   };
 
+  // ---------- import depuis YouTube (outil local sur le PC) ----------
+  const YT = 'http://127.0.0.1:8791';
+  let ytBusy = false;
+  async function ytStatus() {
+    const el = $('#yt-status');
+    if (N.EMBED) {
+      el.className = 'yt-status bad';
+      el.innerHTML = '<b>Indisponible ici.</b> Sur la page claude.ai, le jeu ne peut pas parler à l’outil de ton PC : ouvre le site public du jeu ou le fichier index.html.';
+      return false;
+    }
+    el.className = 'yt-status';
+    el.textContent = 'Recherche de l’outil YouTube sur ce PC…';
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 2500);
+      const r = await fetch(YT + '/status', { cache: 'no-store', signal: ctl.signal });
+      clearTimeout(to);
+      const j = await r.json();
+      if (!j.ok) throw new Error('réponse inattendue');
+      el.className = 'yt-status ok';
+      el.innerHTML = '<b>Outil YouTube connecté.</b>' + (j.busy ? ' Un morceau est déjà en cours, le tien suivra.' : '');
+      return true;
+    } catch (e) {
+      el.className = 'yt-status bad';
+      el.innerHTML = '<b>L’outil YouTube n’est pas lancé.</b> Sur ton PC, ouvre le dossier <code>nocturne-youtube</code> et double-clique sur <code>Lancer outil YouTube.cmd</code>, puis <a id="yt-retry">réessaie</a>.<br>Si ton navigateur demande l’accès aux applications ou au réseau local de cet appareil, accepte : c’est l’outil.';
+      return false;
+    }
+  }
+  U.openYouTube = function () {
+    U.open('mdl-yt');
+    if (!ytBusy) { $('#yt-progress').classList.add('hidden'); ytStatus(); }
+    setTimeout(() => $('#yt-url').focus(), 50);
+  };
+  function ytShow(state, p, msg, err) {
+    const box = $('#yt-progress');
+    box.classList.remove('hidden');
+    box.classList.toggle('err', !!err);
+    const order = ['download', 'transcribe', 'done'];
+    const idx = order.indexOf(state);
+    $$('.yt-steps span', box).forEach((s, i) => { s.classList.toggle('on', i === idx); s.classList.toggle('done', idx > i || state === 'done'); });
+    $('#yt-fill').style.width = Math.round((p || 0) * 100) + '%';
+    $('#yt-msg').textContent = msg || '';
+  }
+  async function ytGo() {
+    if (ytBusy) return;
+    const url = $('#yt-url').value.trim();
+    if (!/^https?:\/\/([a-z]+\.)?(youtube\.com|youtu\.be)\//i.test(url)) { U.toast('Colle un lien YouTube (youtube.com ou youtu.be).', 'err'); return; }
+    if (!(await ytStatus())) return;
+    ytBusy = true;
+    $('#yt-go').disabled = true;
+    ytShow('download', 0.01, 'Récupération du son de la vidéo…');
+    try {
+      const r = await fetch(YT + '/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Demande refusée.');
+      for (;;) {
+        await new Promise((res) => setTimeout(res, 800));
+        const q = await (await fetch(YT + '/jobs/' + j.id, { cache: 'no-store' })).json();
+        if (q.state === 'error') throw new Error(q.error || 'Échec.');
+        const name = q.title ? '« ' + q.title + ' » · ' : '';
+        if (q.state === 'queue') ytShow('download', 0.01, 'En attente de l’outil…');
+        else if (q.state === 'download') ytShow('download', q.progress, name + 'récupération du son…');
+        else if (q.state === 'transcribe') ytShow('transcribe', q.progress, name + 'transcription des notes (environ la durée de la vidéo)…');
+        else if (q.state === 'done') {
+          ytShow('done', 1, name + 'prêt !');
+          const buf = await (await fetch(YT + '/jobs/' + j.id + '/midi', { cache: 'no-store' })).arrayBuffer();
+          const file = new File([buf], (q.title || 'Morceau YouTube').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.mid', { type: 'audio/midi' });
+          const song = await N.songs.importFile(file, { composer: 'Depuis YouTube' });
+          N.progress.unlock('import');
+          U.toast(`<span><b>${N.esc(song.title)}</b><small>Transcrit depuis YouTube · ${song.notes.length} notes · dans « Mes fichiers »</small></span>`, '', 6000);
+          U.close('mdl-yt');
+          $('#yt-url').value = '';
+          libFilter = 'mine';
+          U.show('library');
+          U.openSetup(song);
+          break;
+        }
+      }
+    } catch (e) {
+      ytShow('download', 1, String(e.message || e), true);
+      if (/Failed to fetch|NetworkError|aborted/i.test(String(e))) ytStatus();
+    } finally {
+      ytBusy = false;
+      $('#yt-go').disabled = false;
+    }
+  }
+
   // ---------- importation ----------
   async function importFiles(files) {
     let last = null;
@@ -807,6 +900,10 @@
     $('#lib-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); buildLibrary(); } });
     $('#lib-grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (!c) return; const s = N.songs.get(c.dataset.id); if (s) U.openSetup(s); });
     $('#btn-import').addEventListener('click', () => $('#file-midi').click());
+    $('#btn-yt').addEventListener('click', () => U.openYouTube());
+    $('#yt-go').addEventListener('click', ytGo);
+    $('#yt-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ytGo(); } });
+    $('#yt-status').addEventListener('click', (e) => { if (e.target.id === 'yt-retry') { e.preventDefault(); ytStatus(); } });
     $('#file-midi').addEventListener('change', (e) => { importFiles(Array.from(e.target.files || [])); e.target.value = ''; });
     // préparation
     $('#su-hands').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || b.disabled) return; setupOpt.hands = b.dataset.h; refreshSetup(); });

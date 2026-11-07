@@ -349,6 +349,21 @@ input[type=range] { accent-color: #8fd8ff; height: 22px; }
 .key-row .press { color: var(--gold); font-weight: 700; font-size: 12.5px; }
 .none { color: var(--dim); }
 
+/* import YouTube */
+.yt-status { margin-top: 14px; padding: 11px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.yt-status.ok { border-color: rgba(125, 255, 178, 0.4); color: #cfffe1; }
+.yt-status.bad { border-color: rgba(255, 210, 122, 0.45); color: #ffe9bf; }
+.yt-status code { background: rgba(255, 255, 255, 0.09); padding: 1px 6px; border-radius: 6px; font-size: 12.5px; color: #fff; }
+.yt-status a { color: #9fe6ff; cursor: pointer; }
+.yt-row { display: flex; gap: 8px; }
+.yt-row .text { flex: 1; min-width: 0; user-select: text; }
+.yt-steps { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; font-weight: 750; color: var(--dim); margin: 16px 0 9px; }
+.yt-steps span.on { color: var(--text); }
+.yt-steps span.done { color: var(--ok); }
+.yt-bar { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.yt-bar i { display: block; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, #3fdcff, #b77bff); transition: width 0.45s; }
+.yt-progress.err .yt-bar i { background: var(--danger); }
+
 /* ---------- notifications ---------- */
 #toasts { position: fixed; right: 18px; bottom: calc(var(--kb-h) + 112px); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 30; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(14, 16, 34, 0.92); backdrop-filter: blur(10px); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4); font-weight: 650; font-size: 14px; max-width: 380px; animation: toastin .35s var(--ease); }

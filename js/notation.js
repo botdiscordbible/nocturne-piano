@@ -181,6 +181,42 @@
     return song;
   };
 
+  // séparation main gauche / main droite d'une piste unique (transcriptions, MIDI à une piste) :
+  // chaque note va à la main dont la position récente est la plus proche
+  S.splitHands = function (notes, ppq) {
+    const out = new Array(notes.length);
+    const tol = Math.max(1, Math.round(ppq / 12));
+    let cL = 50, cR = 71, i = 0;
+    while (i < notes.length) {
+      let j = i + 1;
+      while (j < notes.length && notes[j].tick - notes[i].tick <= tol) j++;
+      const grp = [];
+      for (let k = i; k < j; k++) grp.push(k);
+      grp.sort((x, y) => notes[x].midi - notes[y].midi);
+      for (const k of grp) {
+        const m = notes[k].midi;
+        let h = Math.abs(m - cL) <= Math.abs(m - cR) ? 'L' : 'R';
+        if (m <= 47) h = 'L';
+        else if (m >= 79) h = 'R';
+        out[k] = h;
+      }
+      // une main ne s'étend pas sur plus d'une dixième : on rend l'excédent à l'autre main
+      const lows = grp.filter((k) => out[k] === 'L'), highs = grp.filter((k) => out[k] === 'R');
+      if (lows.length > 1) { const base = notes[lows[0]].midi; for (const k of lows) if (notes[k].midi - base > 16) out[k] = 'R'; }
+      if (highs.length > 1) { const top = notes[highs[highs.length - 1]].midi; for (const k of highs) if (top - notes[k].midi > 16) out[k] = 'L'; }
+      for (const k of grp) {
+        if (out[k] === 'L') cL = cL * 0.85 + notes[k].midi * 0.15;
+        else cR = cR * 0.85 + notes[k].midi * 0.15;
+      }
+      // les notes parasites très aiguës ou très graves ne doivent pas emporter les mains
+      cL = N.clamp(cL, 40, 58);
+      cR = N.clamp(cR, 62, 76);
+      if (cR - cL < 10) { const mid = (cL + cR) / 2; cL = mid - 5; cR = mid + 5; }
+      i = j;
+    }
+    return out;
+  };
+
   // ---------- depuis un fichier MIDI ----------
   // assign : tableau index de piste -> 'R' | 'L' | 'A' | 'M' (muet) ; split : note de séparation pour une piste unique
   S.fromMidi = function (parsed, meta, assign, split) {
@@ -229,10 +265,13 @@
     for (const g of groups) {
       const a = assign[g.index] || 'A';
       if (a === 'M') continue;
+      const splitHands = a === 'S' ? S.splitHands(g.notes, parsed.ppq || 480) : null;
+      let gi = -1;
       const pedalByCh = {};
       for (const ch in g.pedal || {}) pedalByCh[ch] = g.pedal[ch].slice().sort((x, y) => x.tick - y.tick);
       for (const n of g.notes) {
-        const hand = a === 'S' ? (n.midi >= split ? 'R' : 'L') : a;
+        gi++;
+        const hand = splitHands ? splitHands[gi] : a;
         const t = t2s(n.tick) - offset, te = t2s(n.end) - offset;
         // durée audio prolongée par la pédale de sustain (si elle est enfoncée au relâchement de la note)
         let endTick = n.end;

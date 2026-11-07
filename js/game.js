@@ -95,16 +95,16 @@
   function bestOctave(pn) {
     if (!pn.length) return N.input.octave;
     const lay = N.input.layout();
-    const dbl = N.settings.layout === 'double';
+    const zones = lay.id !== 'simple';
     let best = null;
     for (let o = 1; o <= 5; o++) {
       const base = 12 * (o + 1);
       let score = 0;
       for (const n of pn) {
         const off = n.midi - base;
-        if (off < 0 || off > lay.span) continue;
+        if (!lay.offsets.has(off)) continue;
         score += 1;
-        if (dbl) {
+        if (zones) {
           if (n.hand === 'L' && off <= lay.lower[1]) score += 0.3;
           if (n.hand !== 'L' && off >= lay.upper[0]) score += 0.3;
         }
@@ -142,12 +142,24 @@
       S.octave = opt.octave != null ? opt.octave : bestOctave(pn);
       N.input.sessionOctave = S.octave;
       if (opt.fold) {
-        const [lo, hi] = N.input.range(S.octave);
+        // chaque note sans touche d'ordinateur est déplacée à l'octave jouable la plus proche,
+        // de préférence dans la zone de sa main ; sinon l'ordinateur la joue pour toi
+        const lay = N.input.layout();
+        const base = N.input.base(S.octave);
+        const zones = lay.id !== 'simple';
         for (const n of pn) {
-          let m = n.midi;
-          while (m < lo) m += 12;
-          while (m > hi) m -= 12;
-          if (m !== n.midi) { n.midi = m; S.folded++; }
+          if (lay.offsets.has(n.midi - base)) continue;
+          let best = null;
+          for (let k = -5; k <= 5; k++) {
+            if (!k) continue;
+            const m = n.midi + 12 * k, off = m - base;
+            if (!lay.offsets.has(off)) continue;
+            const away = zones && (n.hand === 'L' ? off > lay.lower[1] : off < lay.upper[0]) ? 0.6 : 0;
+            const sc = Math.abs(k) + away;
+            if (!best || sc < best.sc) best = { m, sc };
+          }
+          if (best) { n.midi = best.m; S.folded++; }
+          else n.role = 'auto';
         }
         const seen = new Set();
         for (const n of pn) {

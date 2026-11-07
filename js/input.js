@@ -6,6 +6,18 @@
 
   // ---------- dispositions (codes physiques -> décalage en demi-tons depuis le Do de la rangée du bas) ----------
   const LAYOUTS = {
+    // uniquement des lettres : main droite sur la rangée du milieu (blanches) et celle du dessus (noires),
+    // main gauche sur la rangée du bas. Les touches dont la lettre n'existe pas sur ton clavier sont écartées.
+    lettres: {
+      name: 'Lettres seulement',
+      lettersOnly: true,
+      keys: {
+        KeyZ: 0, KeyX: 2, KeyC: 4, KeyV: 5, KeyB: 7, KeyN: 9, KeyM: 11,
+        KeyA: 12, KeyW: 13, KeyS: 14, KeyE: 15, KeyD: 16, KeyF: 17, KeyT: 18, KeyG: 19, KeyY: 20, KeyH: 21, KeyU: 22, KeyJ: 23,
+        KeyK: 24, KeyO: 25, KeyL: 26, KeyP: 27, Semicolon: 28,
+      },
+      lower: [0, 11], upper: [12, 28], span: 28,
+    },
     double: {
       name: 'Deux rangées (2,5 octaves)',
       keys: {
@@ -119,7 +131,24 @@
   I.keysOf = (action) => (I.bindings()[action] || []).map(I.keyName);
   I.isPianoCode = (code) => code === 'Space' || I.layout().keys[code] != null;
 
-  I.layout = () => LAYOUTS[N.settings.layout] || LAYOUTS.double;
+  let layoutCache = { key: '', lay: null };
+  I.layout = function () {
+    const id = LAYOUTS[N.settings.layout] ? N.settings.layout : 'lettres';
+    const ck = id + '|' + N.settings.kbLabels + '|' + detectedName + '|' + (detected ? 1 : 0);
+    if (layoutCache.key === ck) return layoutCache.lay;
+    const base = LAYOUTS[id];
+    let keys = base.keys;
+    if (base.lettersOnly) {
+      keys = {};
+      for (const code in base.keys) if (/^[A-ZÀ-ÖØ-Ý]$/.test(labelOf(code))) keys[code] = base.keys[code];
+    }
+    const offs = new Set(Object.values(keys));
+    const lay = Object.assign({}, base, { id, keys, offsets: offs, span: Math.max(...offs) });
+    layoutCache = { key: ck, lay };
+    return lay;
+  };
+  // une note a-t-elle une touche d'ordinateur ?
+  I.playable = (midi, oct) => I.layout().offsets.has(midi - I.base(oct));
   I.octave = N.settings.octave;
   I.sessionOctave = null; // octave forcée pendant un morceau
   I.curOctave = () => (I.sessionOctave != null ? I.sessionOctave : I.octave);
@@ -137,7 +166,7 @@
     let best = null;
     for (const code in lay.keys) {
       if (lay.keys[code] !== off) continue;
-      const upper = /^(Key[QWERTYUIOP]|Digit|Bracket|Equal)/.test(code) && N.settings.layout === 'double';
+      const upper = /^(Key[QWERTYUIOP]|Digit|Bracket|Equal)/.test(code) && lay.id === 'double';
       const score = hand === 'L' ? (upper ? 0 : 1) : upper ? 1 : 0;
       if (!best || score > best.score) best = { code, score };
     }

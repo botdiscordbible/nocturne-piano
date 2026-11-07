@@ -221,14 +221,15 @@
     song.record = rec;
     return song;
   };
-  S.importFile = async function (file) {
+  S.importFile = async function (file, meta) {
     const bytes = await file.arrayBuffer();
     const parsed = N.midiFile.parse(bytes); // lève une erreur si le fichier est invalide
     const id = 'midi-' + N.hash(bytes);
     let title = file.name.replace(/\.(mid|midi|kar|rmi)$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
     if (!title) title = 'Morceau importé';
-    const rec = { id, title, bytes, added: Date.now(), kind: 'midi' };
-    const song = S.fromMidi(parsed, { id, title }, null, 60);
+    const composer = (meta && meta.composer) || 'Fichier importé';
+    const rec = { id, title, composer, bytes, added: Date.now(), kind: 'midi' };
+    const song = S.fromMidi(parsed, { id, title, composer }, null, 60);
     rec.assign = song.assign;
     song.record = rec;
     await N.idb.put('songs', id, rec);

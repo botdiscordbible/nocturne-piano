@@ -54,6 +54,7 @@
       <h2>Morceaux</h2>
       <div class="head-tools">
         <div class="search"><span data-ico="search"></span><input id="lib-search" type="search" placeholder="Rechercher un morceau" autocomplete="off"></div>
+        <button class="btn" id="btn-yt"><span data-ico="yt"></span>Depuis YouTube</button>
         <button class="btn" id="btn-import"><span data-ico="import"></span>Importer un MIDI</button>
       </div>
     </header>
@@ -269,6 +270,25 @@
         <button class="btn" id="rec-save">Ajouter à mes morceaux</button>
         <button class="btn" id="rec-export">Exporter en fichier MIDI</button>
         <button class="btn ghost" id="rec-discard">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-yt" role="dialog" aria-modal="true">
+    <div class="sheet setup">
+      <button class="btn ghost icon-btn close" data-close aria-label="Fermer"><span data-ico="close"></span></button>
+      <div class="setup-head">
+        <h3>Depuis YouTube</h3>
+        <p class="setup-desc">Colle le lien d’une vidéo : l’outil installé sur ton PC récupère le son et le transforme en morceau jouable, rangé dans « Mes fichiers ». Résultat excellent avec des vidéos de piano (covers, tutoriels), approximatif avec une chanson complète (voix, batterie).</p>
+      </div>
+      <div class="yt-status" id="yt-status"></div>
+      <div class="field"><label for="yt-url">Lien de la vidéo</label>
+        <div class="yt-row"><input type="url" id="yt-url" class="text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false"><button class="btn primary" id="yt-go">Transformer</button></div>
+      </div>
+      <div class="yt-progress hidden" id="yt-progress">
+        <div class="yt-steps"><span data-s="download">1 · Téléchargement</span><span data-s="transcribe">2 · Transcription en notes</span><span data-s="done">3 · Prêt</span></div>
+        <div class="yt-bar"><i id="yt-fill"></i></div>
+        <p class="hint-small" id="yt-msg"></p>
       </div>
     </div>
   </div>

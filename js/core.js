@@ -159,7 +159,8 @@
     accompVolume: 0.75,
     metroVolume: 0.55,
     latencyMs: 0,
-    layout: 'double', // 'double' (2 rangées, 2,5 octaves) | 'simple' (1 rangée)
+    layout: 'lettres', // 'lettres' (lettres seulement) | 'double' (2 rangées + chiffres) | 'simple' (1 rangée)
+    v: 2,
     octave: 3, // Do de la rangée du bas (3 => la rangée A Z E R… commence au Do central)
     kbLabels: 'auto', // 'auto' | 'azerty' | 'qwerty' | 'qwertz'
     kbFormat: '100', // '100' | '80' | 'compact' (75 % / 65 %) | '60'
@@ -177,7 +178,10 @@
     midiIn: 'all',
     autoPause: true,
   };
-  N.settings = Object.assign({}, N.DEFAULTS, N.store.get('settings', {}));
+  const storedSettings = N.store.get('settings', {}) || {};
+  N.settings = Object.assign({}, N.DEFAULTS, storedSettings);
+  // v2 : la disposition « lettres seulement » devient celle par défaut
+  if ((storedSettings.v || 1) < 2) { N.settings.layout = 'lettres'; N.settings.v = 2; N.store.set('settings', N.settings); }
   N.saveSettings = function () { N.store.set('settings', N.settings); N.emit('settings', N.settings); };
 
   // ---------- couleurs ----------
