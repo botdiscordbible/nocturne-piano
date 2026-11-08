@@ -16,6 +16,9 @@
   TL.KEY_CODES = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
   TL.LAP_SPEED = [1, 1.15, 1.3];
   TL.LIVES = 3;
+  // textes affichés pendant la partie (traduisibles par la page qui embarque le moteur)
+  TL.STR = { practice: 'Entraînement', lap: 'Tour {n} · plus vite !', combo: 'Combo {n} !', perfect: 'Parfait', wrong: 'Raté', miss: 'Manqué' };
+  const S_ = (k, n) => TL.STR[k].replace('{n}', n);
   let T = null;
   TL.game = () => T;
 
@@ -121,7 +124,7 @@
     resetLap(T);
     N.game.mode = 'tiles';
     N.renderer.setTilesMode(true);
-    T.banner = { text: (practice ? 'Entraînement' : TL.LEVELS[level].name) + ' · ' + song.title, t0: performance.now() };
+    T.banner = { text: (practice ? TL.STR.practice : TL.LEVELS[level].name) + ' · ' + song.title, t0: performance.now() };
     N.emit('tiles', T);
     return T;
   };
@@ -229,7 +232,7 @@
     g.combo = 0;
     g.misses++;
     if (kind === 'wrong') g.wrongFlash[lane] = 1; else g.flash[lane] = -1;
-    N.renderer.tilePop(lane, kind === 'wrong' ? 'Raté' : 'Manqué', '#ff7088');
+    N.renderer.tilePop(lane, kind === 'wrong' ? TL.STR.wrong : TL.STR.miss, '#ff7088');
     g.lives--;
     N.audio.thud();
     if (g.lives <= 0) end(g, false);
@@ -239,7 +242,7 @@
     if (g.practice || g.lap >= TL.LAP_SPEED.length) { end(g, true); return; }
     g.lap++;
     g.speed = g.baseSpeed * TL.LEVELS[g.level].speed * TL.LAP_SPEED[g.lap - 1];
-    g.banner = { text: 'Tour ' + g.lap + ' · plus vite !', t0: performance.now() };
+    g.banner = { text: S_('lap', g.lap), t0: performance.now() };
     N.renderer.fireworks();
     resetLap(g);
     N.emit('tiles-lap', g);
@@ -315,8 +318,8 @@
     }
     if (g.practice) schedule(g);
     N.renderer.tileHit(lane, best);
-    if (best.judge === 'perfect') N.renderer.tilePop(lane, 'Parfait', '#ffe08a');
-    if (!g.practice && g.combo > 0 && g.combo % 25 === 0) g.banner = { text: 'Combo ' + g.combo + ' !', t0: performance.now(), small: true };
+    if (best.judge === 'perfect') N.renderer.tilePop(lane, TL.STR.perfect, '#ffe08a');
+    if (!g.practice && g.combo > 0 && g.combo % 25 === 0) g.banner = { text: S_('combo', g.combo), t0: performance.now(), small: true };
     N.progress.note();
   };
   TL.release = function (lane) {
